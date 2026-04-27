@@ -1,0 +1,8 @@
+services:
+  golangworkspace:
+    image: golangworkspace
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    ports:
+      - 8000:8000
