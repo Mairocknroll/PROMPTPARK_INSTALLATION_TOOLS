@@ -10,6 +10,8 @@ export function CheckSSHConnection(arg1:string,arg2:string,arg3:string):Promise<
 
 export function ConfigureHikvisionISAPI(arg1:main.HikvisionConfig):Promise<void>;
 
+export function DeployExitKioskAPK(arg1:main.ExitKioskDeployConfig):Promise<void>;
+
 export function DeployKioskAPK(arg1:main.KioskDeployConfig):Promise<void>;
 
 export function DeployToServer(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;

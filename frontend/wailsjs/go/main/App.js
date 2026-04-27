@@ -18,6 +18,10 @@ export function ConfigureHikvisionISAPI(arg1) {
   return window['go']['main']['App']['ConfigureHikvisionISAPI'](arg1);
 }
 
+export function DeployExitKioskAPK(arg1) {
+  return window['go']['main']['App']['DeployExitKioskAPK'](arg1);
+}
+
 export function DeployKioskAPK(arg1) {
   return window['go']['main']['App']['DeployKioskAPK'](arg1);
 }

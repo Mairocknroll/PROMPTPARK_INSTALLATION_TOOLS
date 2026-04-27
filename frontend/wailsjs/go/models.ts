@@ -1,5 +1,86 @@
 export namespace main {
 	
+	export class ExitKioskDevice {
+	    ip: string;
+	    deviceName: string;
+	    gateNo: string;
+	    plcIp: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExitKioskDevice(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ip = source["ip"];
+	        this.deviceName = source["deviceName"];
+	        this.gateNo = source["gateNo"];
+	        this.plcIp = source["plcIp"];
+	    }
+	}
+	export class ExitKioskDeployConfig {
+	    apkPath: string;
+	    devices: ExitKioskDevice[];
+	    parkingCode: string;
+	    projectCode: string;
+	    paymentTicket: string;
+	    serverUrl: string;
+	    localServerUrl: string;
+	    vehicleMode: string;
+	    apiMode: string;
+	    zoningMode: string;
+	    zoningCode: string;
+	    zoningGateNo: string;
+	    nextZoningCode: string;
+	    nextZoningGateNo: string;
+	    isCash: boolean;
+	    isQR: boolean;
+	    ticketMode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExitKioskDeployConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.apkPath = source["apkPath"];
+	        this.devices = this.convertValues(source["devices"], ExitKioskDevice);
+	        this.parkingCode = source["parkingCode"];
+	        this.projectCode = source["projectCode"];
+	        this.paymentTicket = source["paymentTicket"];
+	        this.serverUrl = source["serverUrl"];
+	        this.localServerUrl = source["localServerUrl"];
+	        this.vehicleMode = source["vehicleMode"];
+	        this.apiMode = source["apiMode"];
+	        this.zoningMode = source["zoningMode"];
+	        this.zoningCode = source["zoningCode"];
+	        this.zoningGateNo = source["zoningGateNo"];
+	        this.nextZoningCode = source["nextZoningCode"];
+	        this.nextZoningGateNo = source["nextZoningGateNo"];
+	        this.isCash = source["isCash"];
+	        this.isQR = source["isQR"];
+	        this.ticketMode = source["ticketMode"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class HikCamera {
 	    ip: string;
 	    username: string;
