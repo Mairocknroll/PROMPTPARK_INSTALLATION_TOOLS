@@ -148,6 +148,106 @@ func (a *App) CheckSSHConnection(ip, username, password string) string {
 	return "Success"
 }
 
+func (a *App) ReadRemoteEnv(ip, username, password, targetPath string) (string, error) {
+	if !strings.Contains(ip, ":") {
+		ip = ip + ":22"
+	}
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         10 * time.Second,
+	}
+	client, err := ssh.Dial("tcp", ip, config)
+	if err != nil {
+		return "", fmt.Errorf("ssh connection failed: %v", err)
+	}
+	defer client.Close()
+
+	sess, err := client.NewSession()
+	if err != nil {
+		return "", fmt.Errorf("session failed: %v", err)
+	}
+	defer sess.Close()
+
+	out, err := sess.CombinedOutput(fmt.Sprintf("cat %s/.env", targetPath))
+	if err != nil {
+		return "", fmt.Errorf("read failed: %s", string(out))
+	}
+	return string(out), nil
+}
+
+func (a *App) SaveRemoteEnv(ip, username, password, targetPath, envContent string) error {
+	if !strings.Contains(ip, ":") {
+		ip = ip + ":22"
+	}
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         10 * time.Second,
+	}
+	client, err := ssh.Dial("tcp", ip, config)
+	if err != nil {
+		return fmt.Errorf("ssh connection failed: %v", err)
+	}
+	defer client.Close()
+
+	sess, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("session failed: %v", err)
+	}
+	defer sess.Close()
+	sess.Stdin = strings.NewReader(envContent)
+	err = sess.Run(fmt.Sprintf("cat > %s/.env", targetPath))
+	if err != nil {
+		return fmt.Errorf("write failed: %v", err)
+	}
+	return nil
+}
+
+func (a *App) RedeployProxy(ip, username, password, targetPath string) error {
+	if !strings.Contains(ip, ":") {
+		ip = ip + ":22"
+	}
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         10 * time.Second,
+	}
+	client, err := ssh.Dial("tcp", ip, config)
+	if err != nil {
+		return fmt.Errorf("ssh connection failed: %v", err)
+	}
+	defer client.Close()
+
+	sess, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("session failed: %v", err)
+	}
+	defer sess.Close()
+	
+	cmd := "docker compose down && docker compose up -d"
+	if username != "root" {
+		safePass := strings.ReplaceAll(password, "'", "'\\''")
+		cmd = fmt.Sprintf("echo '%s' | sudo -S docker compose down && echo '%s' | sudo -S docker compose up -d", safePass, safePass)
+	}
+
+	fullCmd := fmt.Sprintf("cd %s && %s", targetPath, cmd)
+	out, err := sess.CombinedOutput(fullCmd)
+	if err != nil {
+		return fmt.Errorf("redeploy failed: %s", string(out))
+	}
+	return nil
+}
+
 // CheckPortInUse attempts to connect to the SSH server and checks if the given port is in use.
 func (a *App) CheckPortInUse(ip, username, password string, port int) bool {
 	if !strings.Contains(ip, ":") {

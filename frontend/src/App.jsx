@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { SaveEnvConfig, CheckSSHConnection, DeployToServer, CheckPortInUse, ConfigureHikvisionISAPI, BrowseAPKFile, DeployKioskAPK } from '../wailsjs/go/main/App';
+import { SaveEnvConfig, CheckSSHConnection, DeployToServer, CheckPortInUse, ConfigureHikvisionISAPI, BrowseAPKFile, DeployKioskAPK, DeployExitKioskAPK, ReadRemoteEnv, SaveRemoteEnv, RedeployProxy } from '../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../wailsjs/runtime/runtime';
 
 function App() {
@@ -37,6 +37,65 @@ function App() {
     const [isDeploying, setIsDeploying] = useState(false);
     const [deployProgress, setDeployProgress] = useState(0);
     const [isConnectionTested, setIsConnectionTested] = useState(false);
+
+    const [proxyTab, setProxyTab] = useState('new'); // 'new' or 'edit'
+
+    const parseEnvToState = (envString) => {
+        const lines = envString.split('\n');
+        const newSystem = { ...system };
+        const newLanes = [];
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith('#')) continue;
+            const [key, ...valParts] = trimmed.split('=');
+            if (!key) continue;
+            const value = valParts.join('=');
+
+            if (newSystem[key] !== undefined) {
+                newSystem[key] = value;
+                continue;
+            }
+
+            const laneMatch = key.match(/^(ENT|EXT)_GATE_(\d+)$/);
+            if (laneMatch) {
+                const type = laneMatch[1];
+                const suffix = laneMatch[2];
+                newLanes.push({
+                    id: Date.now() + Math.random(),
+                    type: type,
+                    number: suffix,
+                    gateIp: value,
+                    lprIp: '',
+                    licIp: '',
+                    driIp: '',
+                    hasLed: false,
+                    ledIp: ''
+                });
+            } else {
+                const propMatch = key.match(/^(LPR|LIC|DRI|HIK_LED_MAIN)_(IN|OUT|ENT|EXT)_(\d+)$/);
+                if (propMatch) {
+                    const prop = propMatch[1];
+                    const io = propMatch[2];
+                    const suffix = propMatch[3];
+                    const targetType = (io === 'IN' || io === 'ENT') ? 'ENT' : 'EXT';
+
+                    const lane = newLanes.find(l => l.number === suffix && l.type === targetType);
+                    if (lane) {
+                        if (prop === 'LPR') lane.lprIp = value;
+                        if (prop === 'LIC') lane.licIp = value;
+                        if (prop === 'DRI') lane.driIp = value;
+                        if (prop === 'HIK_LED_MAIN') {
+                            lane.hasLed = true;
+                            lane.ledIp = value;
+                        }
+                    }
+                }
+            }
+        }
+        setSystem(newSystem);
+        setLanes(newLanes);
+    };
 
     // 5. State สำหรับ Hikvision Config
     const [hikTargetIp, setHikTargetIp] = useState('');
@@ -153,6 +212,10 @@ function App() {
     }, [system, lanes]);
 
     const handleAddLane = () => {
+        if (!newLane.gateIp) {
+            alert('Gate IP is required!');
+            return;
+        }
         setLanes([...lanes, { ...newLane, id: Date.now() }]);
         setShowModal(false);
         setNewLane({ type: 'ENT', number: String(lanes.length + 2).padStart(2, '0'), gateIp: '', lprIp: '', licIp: '', driIp: '', hasLed: false, ledIp: '' });
@@ -194,6 +257,48 @@ function App() {
             setDeployStatus('❌ Connection Failed: ' + result);
             setIsConnectionTested(false);
         }
+    };
+
+    const handleReadEnv = async () => {
+        if (!serverConfig.ip || !serverConfig.username || !serverConfig.password || !serverConfig.targetPath) {
+            alert("Please fill in all server details.");
+            return;
+        }
+        setDeployStatus('Reading .env from server...');
+        try {
+            const result = await ReadRemoteEnv(serverConfig.ip, serverConfig.username, serverConfig.password, serverConfig.targetPath);
+            parseEnvToState(result);
+            setDeployStatus('✅ Successfully read and parsed .env from server!');
+            setIsConnectionTested(true);
+        } catch (e) {
+            setDeployStatus('❌ Failed to read .env: ' + e);
+            setIsConnectionTested(false);
+        }
+    };
+
+    const handleSaveRemoteEnv = async () => {
+        setIsDeploying(true);
+        setDeployStatus('Saving .env to server...');
+        try {
+            await SaveRemoteEnv(serverConfig.ip, serverConfig.username, serverConfig.password, serverConfig.targetPath, envContent);
+            setDeployStatus('✅ Successfully saved .env to server!');
+        } catch (e) {
+            setDeployStatus('❌ Failed to save .env: ' + e);
+        }
+        setIsDeploying(false);
+    };
+
+    const handleRedeployRemoteEnv = async () => {
+        setIsDeploying(true);
+        setDeployStatus('Saving .env and redeploying proxy (docker compose down & up)...');
+        try {
+            await SaveRemoteEnv(serverConfig.ip, serverConfig.username, serverConfig.password, serverConfig.targetPath, envContent);
+            await RedeployProxy(serverConfig.ip, serverConfig.username, serverConfig.password, serverConfig.targetPath);
+            setDeployStatus('✅ Successfully saved .env and redeployed proxy!');
+        } catch (e) {
+            setDeployStatus('❌ Failed to redeploy: ' + e);
+        }
+        setIsDeploying(false);
     };
 
     const handleDeploy = async () => {
@@ -359,25 +464,45 @@ function App() {
                 <div className="max-w-6xl mx-auto">
                     {activeMenu === 'install_proxy' && (
                         <>
-                            <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
+                            <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
                                 <div>
                                     <h2 className="text-2xl font-bold text-white">Local Proxy API</h2>
-                                    <p className="text-xs text-gray-500 mt-1">Step {step}: {step === 1 ? 'Configuration' : 'Deploy to Server'}</p>
+                                    <p className="text-xs text-gray-500 mt-1">Manage local proxy installation and configuration</p>
                                 </div>
-                                <div className="flex gap-3">
-                                    {step === 1 ? (
-                                        <>
-                                            <button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm transition-all">+ Add Lane</button>
-                                            <button onClick={handleSave} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm transition-all text-bold">Save Local</button>
-                                            <button onClick={() => setStep(2)} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-md text-sm transition-all font-bold">Next Step ➡️</button>
-                                        </>
-                                    ) : (
-                                        <button onClick={() => setStep(1)} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm transition-all">⬅️ Back to Config</button>
-                                    )}
+                                <div className="flex bg-[#090c10] p-1 rounded-lg border border-gray-800">
+                                    <button
+                                        onClick={() => { setProxyTab('new'); setStep(1); }}
+                                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${proxyTab === 'new' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                                    >
+                                        New Install
+                                    </button>
+                                    <button
+                                        onClick={() => { setProxyTab('edit'); setStep(1); }}
+                                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${proxyTab === 'edit' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                                    >
+                                        Edit (Revise)
+                                    </button>
                                 </div>
                             </div>
 
-                            {step === 1 ? (
+                            {proxyTab === 'new' && (
+                                <div className="mb-4 flex justify-between items-center">
+                                    <h3 className="text-sm font-bold text-gray-400">Step {step}: {step === 1 ? 'Configuration' : 'Deploy to Server'}</h3>
+                                    <div className="flex gap-3">
+                                        {step === 1 ? (
+                                            <>
+                                                <button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm transition-all">+ Add Lane</button>
+                                                <button onClick={handleSave} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm transition-all font-bold">Save Local</button>
+                                                <button onClick={() => setStep(2)} disabled={lanes.length === 0} className={`px-4 py-2 rounded-md text-sm transition-all font-bold ${lanes.length === 0 ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'}`}>Next Step</button>
+                                            </>
+                                        ) : (
+                                            <button onClick={() => setStep(1)} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm transition-all">⬅️ Back to Config</button>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {proxyTab === 'new' && step === 1 ? (
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                     {/* Left: Config Lists */}
                                     <div className="lg:col-span-2 space-y-6">
@@ -426,7 +551,7 @@ function App() {
                                         </pre>
                                     </div>
                                 </div>
-                            ) : (
+                            ) : proxyTab === 'new' && step === 2 ? (
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                     <div className="lg:col-span-1 space-y-6">
                                         <div className="bg-[#161b22] border border-gray-800 rounded-lg p-5">
@@ -506,6 +631,129 @@ function App() {
                                             </pre>
                                         </div>
                                     </div>
+                                </div>
+                            ) : null}
+
+                            {proxyTab === 'edit' && (
+                                <div className="space-y-6">
+                                    <div className="bg-[#161b22] border border-gray-800 rounded-lg p-5">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h2 className="text-blue-400 text-xs font-bold uppercase tracking-tighter">Server Connection</h2>
+                                            <div className="flex gap-2">
+                                                <button onClick={handleReadEnv} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 text-xs font-bold rounded">Read .env</button>
+                                                <button onClick={handleSaveRemoteEnv} disabled={!isConnectionTested} className={`px-3 py-1.5 text-xs font-bold rounded ${!isConnectionTested ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-500 text-white'}`}>Save Env Only</button>
+                                                <button onClick={handleRedeployRemoteEnv} disabled={!isConnectionTested} className={`px-3 py-1.5 text-xs font-bold rounded ${!isConnectionTested ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'}`}>Save & Redeploy</button>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-4 gap-4">
+                                            <div>
+                                                <label className="text-[10px] text-gray-500 block mb-1">Server IP</label>
+                                                <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1.5 text-sm" value={serverConfig.ip} onChange={e => setServerConfig({ ...serverConfig, ip: e.target.value })} placeholder="192.168.1.100" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-500 block mb-1">Username</label>
+                                                <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1.5 text-sm" value={serverConfig.username} onChange={e => setServerConfig({ ...serverConfig, username: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-500 block mb-1">Password</label>
+                                                <input type="password" className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1.5 text-sm" value={serverConfig.password} onChange={e => setServerConfig({ ...serverConfig, password: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-gray-500 block mb-1">Target Directory</label>
+                                                <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1.5 text-sm text-yellow-500" value={serverConfig.targetPath} onChange={e => setServerConfig({ ...serverConfig, targetPath: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 text-xs">
+                                            {deployStatus && <span className={deployStatus.includes('✅') ? 'text-green-400' : 'text-red-400'}>{deployStatus}</span>}
+                                        </div>
+                                    </div>
+
+                                    {isConnectionTested && (
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                            <div className="lg:col-span-2 space-y-6">
+                                                <div className="bg-[#161b22] border border-gray-800 rounded-lg p-5">
+                                                    <h2 className="text-blue-400 text-xs font-bold uppercase mb-4 tracking-tighter">System Base Config</h2>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        {Object.keys(system).map(key => (
+                                                            <div key={key}>
+                                                                <label className="text-[10px] text-gray-500 block mb-1">{key}</label>
+                                                                <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1.5 text-sm" value={system[key]} onChange={(e) => setSystem({ ...system, [key]: e.target.value })} />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex justify-between items-center mt-6 mb-2">
+                                                    <h2 className="text-blue-400 text-xs font-bold uppercase tracking-tighter">Lanes Configuration</h2>
+                                                    <button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md text-xs transition-all">+ Add Lane</button>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {lanes.map((lane, idx) => (
+                                                        <div key={lane.id} className="bg-[#161b22] border border-gray-700 rounded-lg p-4 relative">
+                                                            <button onClick={() => setLanes(lanes.filter(l => l.id !== lane.id))} className="absolute top-2 right-2 text-gray-600 hover:text-red-500 text-xs">Delete</button>
+                                                            <div className="flex items-center gap-2 mb-3">
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded ${lane.type === 'ENT' ? 'bg-green-900 text-green-300' : 'bg-orange-900 text-orange-300'}`}>
+                                                                    {lane.type === 'ENT' ? 'ENTRY' : 'EXIT'} {lane.number}
+                                                                </span>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <div>
+                                                                    <label className="text-[10px] text-gray-500 block">Gate IP</label>
+                                                                    <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1 text-xs" value={lane.gateIp} onChange={(e) => {
+                                                                        const newLanes = [...lanes];
+                                                                        newLanes[idx].gateIp = e.target.value;
+                                                                        setLanes(newLanes);
+                                                                    }} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-gray-500 block">LPR IP</label>
+                                                                    <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1 text-xs" value={lane.lprIp} onChange={(e) => {
+                                                                        const newLanes = [...lanes];
+                                                                        newLanes[idx].lprIp = e.target.value;
+                                                                        setLanes(newLanes);
+                                                                    }} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-gray-500 block">LIC IP</label>
+                                                                    <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1 text-xs" value={lane.licIp} onChange={(e) => {
+                                                                        const newLanes = [...lanes];
+                                                                        newLanes[idx].licIp = e.target.value;
+                                                                        setLanes(newLanes);
+                                                                    }} />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-gray-500 block">DRI IP</label>
+                                                                    <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1 text-xs" value={lane.driIp} onChange={(e) => {
+                                                                        const newLanes = [...lanes];
+                                                                        newLanes[idx].driIp = e.target.value;
+                                                                        setLanes(newLanes);
+                                                                    }} />
+                                                                </div>
+                                                                {lane.hasLed && (
+                                                                    <div>
+                                                                        <label className="text-[10px] text-blue-500 block">LED IP</label>
+                                                                        <input className="w-full bg-[#0d1117] border border-blue-900/50 rounded px-2 py-1 text-xs text-blue-400" value={lane.ledIp} onChange={(e) => {
+                                                                            const newLanes = [...lanes];
+                                                                            newLanes[idx].ledIp = e.target.value;
+                                                                            setLanes(newLanes);
+                                                                        }} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-[#090c10] border border-gray-800 rounded-lg p-5 h-[70vh] overflow-y-auto sticky top-8">
+                                                <h2 className="text-[10px] text-gray-500 uppercase tracking-widest mb-4">Live .env Preview</h2>
+                                                <pre className="text-[11px] text-green-500 font-mono whitespace-pre-wrap leading-5">
+                                                    {envContent}
+                                                </pre>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </>

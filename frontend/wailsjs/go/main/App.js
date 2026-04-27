@@ -34,6 +34,18 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function ReadRemoteEnv(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ReadRemoteEnv'](arg1, arg2, arg3, arg4);
+}
+
+export function RedeployProxy(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RedeployProxy'](arg1, arg2, arg3, arg4);
+}
+
 export function SaveEnvConfig(arg1) {
   return window['go']['main']['App']['SaveEnvConfig'](arg1);
+}
+
+export function SaveRemoteEnv(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['SaveRemoteEnv'](arg1, arg2, arg3, arg4, arg5);
 }
