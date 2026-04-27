@@ -211,14 +211,22 @@ function App() {
         return lines.join('\n');
     }, [system, lanes]);
 
+    const handleOpenAddLaneModal = () => {
+        setNewLane({ type: 'ENT', number: String(lanes.length + 1).padStart(2, '0'), gateIp: '', lprIp: '', licIp: '', driIp: '', hasLed: false, ledIp: '' });
+        setShowModal(true);
+    };
+
     const handleAddLane = () => {
         if (!newLane.gateIp) {
             alert('Gate IP is required!');
             return;
         }
-        setLanes([...lanes, { ...newLane, id: Date.now() }]);
+        if (newLane.id) {
+            setLanes(lanes.map(l => l.id === newLane.id ? newLane : l));
+        } else {
+            setLanes([...lanes, { ...newLane, id: Date.now() }]);
+        }
         setShowModal(false);
-        setNewLane({ type: 'ENT', number: String(lanes.length + 2).padStart(2, '0'), gateIp: '', lprIp: '', licIp: '', driIp: '', hasLed: false, ledIp: '' });
     };
 
     const handleGateIpBlur = () => {
@@ -491,7 +499,7 @@ function App() {
                                     <div className="flex gap-3">
                                         {step === 1 ? (
                                             <>
-                                                <button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm transition-all">+ Add Lane</button>
+                                                <button onClick={handleOpenAddLaneModal} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm transition-all">+ Add Lane</button>
                                                 <button onClick={handleSave} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md text-sm transition-all font-bold">Save Local</button>
                                                 <button onClick={() => setStep(2)} disabled={lanes.length === 0} className={`px-4 py-2 rounded-md text-sm transition-all font-bold ${lanes.length === 0 ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-500 text-white'}`}>Next Step</button>
                                             </>
@@ -527,7 +535,10 @@ function App() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {lanes.map((lane) => (
                                                 <div key={lane.id} className="bg-[#161b22] border border-gray-700 rounded-lg p-4 relative group">
-                                                    <button onClick={() => setLanes(lanes.filter(l => l.id !== lane.id))} className="absolute top-2 right-2 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">Delete</button>
+                                                    <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button onClick={() => { setNewLane(lane); setShowModal(true); }} className="text-gray-400 hover:text-blue-400 text-xs font-bold transition-colors">Edit</button>
+                                                        <button onClick={() => setLanes(lanes.filter(l => l.id !== lane.id))} className="text-gray-400 hover:text-red-500 text-xs font-bold transition-colors">Delete</button>
+                                                    </div>
                                                     <div className="flex items-center gap-2 mb-3">
                                                         <span className={`text-[10px] px-2 py-0.5 rounded ${lane.type === 'ENT' ? 'bg-green-900 text-green-300' : 'bg-orange-900 text-orange-300'}`}>
                                                             {lane.type === 'ENT' ? 'ENTRY' : 'EXIT'} {lane.number}
@@ -536,6 +547,8 @@ function App() {
                                                     <div className="space-y-1 text-xs">
                                                         <p><span className="text-gray-500">Gate:</span> {lane.gateIp}</p>
                                                         <p><span className="text-gray-500">LPR:</span> {lane.lprIp}</p>
+                                                        <p><span className="text-gray-500">LIC:</span> {lane.licIp}</p>
+                                                        <p><span className="text-gray-500">DRI:</span> {lane.driIp}</p>
                                                         {lane.hasLed && <p><span className="text-blue-500">LED:</span> {lane.ledIp}</p>}
                                                     </div>
                                                 </div>
@@ -1232,7 +1245,7 @@ function App() {
             {showModal && (
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
                     <div className="bg-[#161b22] border border-gray-700 rounded-xl w-full max-w-md p-6 shadow-2xl">
-                        <h2 className="text-xl font-bold text-white mb-6">Setup New Lane</h2>
+                        <h2 className="text-xl font-bold text-white mb-6">{newLane.id ? 'Edit Lane' : 'Setup New Lane'}</h2>
                         <div className="space-y-4">
                             <div className="flex gap-4">
                                 <div className="flex-1">
@@ -1285,7 +1298,7 @@ function App() {
 
                             <div className="flex gap-3 pt-6">
                                 <button onClick={() => setShowModal(false)} className="flex-1 text-gray-400 hover:text-white text-sm">Cancel</button>
-                                <button onClick={handleAddLane} className="flex-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-2 rounded-lg text-sm font-bold transition-colors">Apply Lane</button>
+                                <button onClick={handleAddLane} className="flex-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-2 rounded-lg text-sm font-bold transition-colors">{newLane.id ? 'Save Changes' : 'Apply Lane'}</button>
                             </div>
                         </div>
                     </div>
