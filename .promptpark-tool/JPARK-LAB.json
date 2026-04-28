@@ -1,0 +1,66 @@
+{
+  "name": "JPARK-LAB",
+  "updatedAt": "2026-04-28T20:41:07+07:00",
+  "data": {
+    "id": "JPARK-LAB-1777380333434",
+    "name": "JPARK-LAB",
+    "system": {
+      "SERVER_URL": "https://siph-api.jparkdev.co",
+      "PARKING_CODE": "si25030029",
+      "ADDR": "0.0.0.0:8000",
+      "CAMERA_USER": "admin",
+      "CAMERA_PASS": "Jp@rk1ng",
+      "MODBUS_PORT": "504",
+      "MODBUS_TIMEOUT_MS": "2000",
+      "MODBUS_PULSE_MS": "5000",
+      "MODBUS_SLAVE_ID": "1"
+    },
+    "lanes": [
+      {
+        "id": "ENT-01-1777383667843",
+        "type": "ENT",
+        "number": "01",
+        "gateIp": "172.20.9.110",
+        "lprIp": "172.20.9.32",
+        "licIp": "172.20.9.40",
+        "driIp": "172.20.9.50",
+        "hasLed": true,
+        "ledIp": "10.10.22.195"
+      },
+      {
+        "id": "EXT-01-1777383667844",
+        "type": "EXT",
+        "number": "01",
+        "gateIp": "172.20.9.10",
+        "lprIp": "172.20.9.31",
+        "licIp": "172.20.9.40",
+        "driIp": "172.20.9.50",
+        "hasLed": true,
+        "ledIp": "10.10.22.196"
+      },
+      {
+        "id": "ENT-02-1777383667844",
+        "type": "ENT",
+        "number": "02",
+        "gateIp": "172.20.9.11",
+        "lprIp": "172.20.9.31",
+        "licIp": "172.20.9.41",
+        "driIp": "172.20.9.51",
+        "hasLed": false,
+        "ledIp": ""
+      }
+    ],
+    "serverConfig": {
+      "ip": "172.20.9.2",
+      "username": "jpark",
+      "password": "",
+      "targetPath": "/home/jpark/go_local_proxy_api"
+    },
+    "status": {
+      "lastDeployStatus": "loaded",
+      "lastDeployAt": "",
+      "lastHealthcheckAt": "2026-04-28T12:47:19.367Z",
+      "lastHealthcheckStatus": "ok"
+    }
+  }
+}

@@ -4,11 +4,15 @@ import {main} from '../models';
 
 export function BrowseAPKFile():Promise<string>;
 
+export function CheckADBAvailability():Promise<string>;
+
 export function CheckPortInUse(arg1:string,arg2:string,arg3:string,arg4:number):Promise<boolean>;
 
 export function CheckSSHConnection(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function ConfigureHikvisionISAPI(arg1:main.HikvisionConfig):Promise<void>;
+
+export function DeleteInstallationProfile(arg1:string):Promise<void>;
 
 export function DeployExitKioskAPK(arg1:main.ExitKioskDeployConfig):Promise<void>;
 
@@ -16,7 +20,13 @@ export function DeployKioskAPK(arg1:main.KioskDeployConfig):Promise<void>;
 
 export function DeployToServer(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
 
+export function DiagnoseADBDevice(arg1:string,arg2:string):Promise<Array<main.PreflightCheck>>;
+
 export function Greet(arg1:string):Promise<string>;
+
+export function ListDeploymentHistory():Promise<Array<main.DeploymentHistoryRecord>>;
+
+export function ListInstallationProfiles():Promise<Array<main.InstallationProfile>>;
 
 export function ReadEntranceKioskConfig(arg1:string):Promise<Record<string, string>>;
 
@@ -26,7 +36,15 @@ export function ReadRemoteEnv(arg1:string,arg2:string,arg3:string,arg4:string):P
 
 export function RedeployProxy(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
+export function RestoreLatestProxyEnvBackup(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function RunProxyHealthCheck(arg1:string,arg2:number):Promise<main.ValidationReport>;
+
+export function RunServerPreflight(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:number):Promise<Array<main.PreflightCheck>>;
+
 export function SaveEnvConfig(arg1:string):Promise<string>;
+
+export function SaveInstallationProfile(arg1:main.InstallationProfile):Promise<void>;
 
 export function SaveRemoteEnv(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
@@ -39,3 +57,11 @@ export function StopProxyLogs():Promise<void>;
 export function UpdateEntranceKioskConfig(arg1:Array<main.EntranceConfig>):Promise<void>;
 
 export function UpdateExitKioskConfig(arg1:Array<main.ExitConfig>):Promise<void>;
+
+export function ValidateEntranceKioskConfig(arg1:main.KioskDeployConfig):Promise<main.ValidationReport>;
+
+export function ValidateExitKioskConfig(arg1:main.ExitKioskDeployConfig):Promise<main.ValidationReport>;
+
+export function ValidateHikvisionConfig(arg1:main.HikvisionConfig):Promise<main.ValidationReport>;
+
+export function ValidateProxyEnv(arg1:string):Promise<main.ValidationReport>;

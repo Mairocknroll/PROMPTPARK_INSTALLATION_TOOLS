@@ -6,6 +6,10 @@ export function BrowseAPKFile() {
   return window['go']['main']['App']['BrowseAPKFile']();
 }
 
+export function CheckADBAvailability() {
+  return window['go']['main']['App']['CheckADBAvailability']();
+}
+
 export function CheckPortInUse(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CheckPortInUse'](arg1, arg2, arg3, arg4);
 }
@@ -16,6 +20,10 @@ export function CheckSSHConnection(arg1, arg2, arg3) {
 
 export function ConfigureHikvisionISAPI(arg1) {
   return window['go']['main']['App']['ConfigureHikvisionISAPI'](arg1);
+}
+
+export function DeleteInstallationProfile(arg1) {
+  return window['go']['main']['App']['DeleteInstallationProfile'](arg1);
 }
 
 export function DeployExitKioskAPK(arg1) {
@@ -30,8 +38,20 @@ export function DeployToServer(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['DeployToServer'](arg1, arg2, arg3, arg4, arg5);
 }
 
+export function DiagnoseADBDevice(arg1, arg2) {
+  return window['go']['main']['App']['DiagnoseADBDevice'](arg1, arg2);
+}
+
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
+}
+
+export function ListDeploymentHistory() {
+  return window['go']['main']['App']['ListDeploymentHistory']();
+}
+
+export function ListInstallationProfiles() {
+  return window['go']['main']['App']['ListInstallationProfiles']();
 }
 
 export function ReadEntranceKioskConfig(arg1) {
@@ -50,8 +70,24 @@ export function RedeployProxy(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['RedeployProxy'](arg1, arg2, arg3, arg4);
 }
 
+export function RestoreLatestProxyEnvBackup(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RestoreLatestProxyEnvBackup'](arg1, arg2, arg3, arg4);
+}
+
+export function RunProxyHealthCheck(arg1, arg2) {
+  return window['go']['main']['App']['RunProxyHealthCheck'](arg1, arg2);
+}
+
+export function RunServerPreflight(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['RunServerPreflight'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function SaveEnvConfig(arg1) {
   return window['go']['main']['App']['SaveEnvConfig'](arg1);
+}
+
+export function SaveInstallationProfile(arg1) {
+  return window['go']['main']['App']['SaveInstallationProfile'](arg1);
 }
 
 export function SaveRemoteEnv(arg1, arg2, arg3, arg4, arg5) {
@@ -76,4 +112,20 @@ export function UpdateEntranceKioskConfig(arg1) {
 
 export function UpdateExitKioskConfig(arg1) {
   return window['go']['main']['App']['UpdateExitKioskConfig'](arg1);
+}
+
+export function ValidateEntranceKioskConfig(arg1) {
+  return window['go']['main']['App']['ValidateEntranceKioskConfig'](arg1);
+}
+
+export function ValidateExitKioskConfig(arg1) {
+  return window['go']['main']['App']['ValidateExitKioskConfig'](arg1);
+}
+
+export function ValidateHikvisionConfig(arg1) {
+  return window['go']['main']['App']['ValidateHikvisionConfig'](arg1);
+}
+
+export function ValidateProxyEnv(arg1) {
+  return window['go']['main']['App']['ValidateProxyEnv'](arg1);
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ConfigureHikvisionISAPI } from '../../wailsjs/go/main/App';
+import { ConfigureHikvisionISAPI, ValidateHikvisionConfig } from '../../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 
 function HikConfig() {
@@ -11,6 +11,7 @@ function HikConfig() {
     const [hikStatus, setHikStatus] = useState('');
     const [isHikApplying, setIsHikApplying] = useState(false);
     const [hikProgress, setHikProgress] = useState(0);
+    const [validationReport, setValidationReport] = useState(null);
 
     useEffect(() => {
         EventsOn("hik-progress", (data) => {
@@ -31,6 +32,16 @@ function HikConfig() {
     const handleApplyHik = async () => {
         if (!hikTargetIp || !hikTargetPort || hikCameras.length === 0) {
             alert('Please set Target IP, Port and add at least one camera.');
+            return;
+        }
+        const report = await ValidateHikvisionConfig({
+            targetIp: hikTargetIp,
+            targetPort: hikTargetPort,
+            cameras: hikCameras.map(c => ({ ip: c.ip, username: c.username, password: c.password, type: c.type, gateNo: c.gateNo }))
+        });
+        setValidationReport(report);
+        if (!report.ok) {
+            alert('Please fix validation errors before applying camera configuration.');
             return;
         }
         setIsHikApplying(true);
@@ -69,6 +80,12 @@ function HikConfig() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-1 space-y-6">
+                    {validationReport && !validationReport.ok && (
+                        <div className="bg-red-950/30 border border-red-900 rounded-lg p-3 text-xs text-red-300 space-y-1">
+                            {validationReport.issues.map((i, idx) => <div key={idx}>{i.field}: {i.message}</div>)}
+                        </div>
+                    )}
+
                     {/* Target Server */}
                     <div className="bg-[#161b22] border border-gray-800 rounded-lg p-5">
                         <h2 className="text-blue-400 text-xs font-bold uppercase mb-4 tracking-tighter">Target Local Server</h2>

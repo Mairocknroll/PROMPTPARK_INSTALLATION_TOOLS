@@ -77,7 +77,7 @@ func (a *App) ReadRemoteEnv(ip, username, password, targetPath string) (string, 
 	}
 	defer sess.Close()
 
-	out, err := sess.CombinedOutput(fmt.Sprintf("cat %s/.env", targetPath))
+	out, err := sess.CombinedOutput(fmt.Sprintf("cat %s/.env", shellQuote(targetPath)))
 	if err != nil {
 		return "", fmt.Errorf("read failed: %s", string(out))
 	}
@@ -108,7 +108,7 @@ func (a *App) SaveRemoteEnv(ip, username, password, targetPath, envContent strin
 	}
 	defer sess.Close()
 	sess.Stdin = strings.NewReader(envContent)
-	err = sess.Run(fmt.Sprintf("cat > %s/.env", targetPath))
+	err = sess.Run(fmt.Sprintf("cd %s && if [ -f .env ]; then cp .env .env.backup.$(date +%%Y%%m%%d%%H%%M%%S); fi && cat > .env", shellQuote(targetPath)))
 	if err != nil {
 		return fmt.Errorf("write failed: %v", err)
 	}
@@ -138,17 +138,55 @@ func (a *App) RedeployProxy(ip, username, password, targetPath string) error {
 		return fmt.Errorf("session failed: %v", err)
 	}
 	defer sess.Close()
-	
+
 	cmd := "docker compose down && docker compose up -d"
 	if username != "root" {
 		safePass := strings.ReplaceAll(password, "'", "'\\''")
 		cmd = fmt.Sprintf("echo '%s' | sudo -S docker compose down && echo '%s' | sudo -S docker compose up -d", safePass, safePass)
 	}
 
-	fullCmd := fmt.Sprintf("cd %s && %s", targetPath, cmd)
+	fullCmd := fmt.Sprintf("cd %s && %s", shellQuote(targetPath), cmd)
 	out, err := sess.CombinedOutput(fullCmd)
 	if err != nil {
 		return fmt.Errorf("redeploy failed: %s", string(out))
+	}
+	return nil
+}
+
+func (a *App) RestoreLatestProxyEnvBackup(ip, username, password, targetPath string) error {
+	if !strings.Contains(ip, ":") {
+		ip = ip + ":22"
+	}
+	config := &ssh.ClientConfig{
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         10 * time.Second,
+	}
+	client, err := ssh.Dial("tcp", ip, config)
+	if err != nil {
+		return fmt.Errorf("ssh connection failed: %v", err)
+	}
+	defer client.Close()
+
+	cmd := "latest=$(ls -t .env.backup.* 2>/dev/null | head -n 1); if [ -z \"$latest\" ]; then echo 'no backup found'; exit 2; fi; cp \"$latest\" .env"
+	if username != "root" {
+		safePass := strings.ReplaceAll(password, "'", "'\\''")
+		cmd = fmt.Sprintf("latest=$(ls -t .env.backup.* 2>/dev/null | head -n 1); if [ -z \"$latest\" ]; then echo 'no backup found'; exit 2; fi; cp \"$latest\" .env && echo '%s' | sudo -S docker compose up -d", safePass)
+	} else {
+		cmd += " && docker compose up -d"
+	}
+
+	sess, err := client.NewSession()
+	if err != nil {
+		return fmt.Errorf("session failed: %v", err)
+	}
+	defer sess.Close()
+	out, err := sess.CombinedOutput(fmt.Sprintf("cd %s && %s", shellQuote(targetPath), cmd))
+	if err != nil {
+		return fmt.Errorf("restore failed: %s", string(out))
 	}
 	return nil
 }
@@ -244,7 +282,21 @@ func tarFS(fsys fs.FS, baseDir string) ([]byte, error) {
 }
 
 func (a *App) DeployToServer(ip, username, password, targetPath, envContent string) string {
-	a.emitEvent("deploy-progress",5, "Initializing deployment...")
+	a.emitEvent("deploy-progress", 5, "Initializing deployment...")
+	record := DeploymentHistoryRecord{Server: ip, TargetPath: targetPath, EnvContent: envContent, Status: "failed"}
+	defer func() {
+		appendDeploymentHistory(record)
+	}()
+
+	if report := a.ValidateProxyEnv(envContent); !report.OK {
+		record.Message = "validation failed"
+		a.emitEvent("deploy-progress", 0, "Validation failed. Fix configuration before deploy.")
+		var parts []string
+		for _, issue := range report.Issues {
+			parts = append(parts, issue.Field+": "+issue.Message)
+		}
+		return "Validation failed:\n" + strings.Join(parts, "\n")
+	}
 
 	if !strings.Contains(ip, ":") {
 		ip = ip + ":22"
@@ -258,77 +310,93 @@ func (a *App) DeployToServer(ip, username, password, targetPath, envContent stri
 		Timeout:         10 * time.Second,
 	}
 
-	a.emitEvent("deploy-progress",10, "Compressing embedded source code (tar.gz)...")
+	a.emitEvent("deploy-progress", 10, "Compressing embedded source code (tar.gz)...")
 	// 1. Tar.gz the embedded files
 	tarData, err := tarFS(proxyAPI, "proxy_api_template")
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error compressing files")
+		record.Message = err.Error()
+		a.emitEvent("deploy-progress", 0, "Error compressing files")
 		return "Error compressing files: " + err.Error()
 	}
 
-	a.emitEvent("deploy-progress",20, "Connecting to SSH server...")
+	a.emitEvent("deploy-progress", 20, "Connecting to SSH server...")
 	client, err := ssh.Dial("tcp", ip, config)
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error connecting SSH")
+		record.Message = err.Error()
+		a.emitEvent("deploy-progress", 0, "Error connecting SSH")
 		return "Error connecting SSH: " + err.Error()
 	}
 	defer client.Close()
 
 	// Step 2.1: Create dir
-	a.emitEvent("deploy-progress",30, "Creating target directory on server...")
+	a.emitEvent("deploy-progress", 30, "Creating target directory on server...")
 	sess1, _ := client.NewSession()
-	_ = sess1.Run(fmt.Sprintf("mkdir -p %s", targetPath))
+	_ = sess1.Run(fmt.Sprintf("mkdir -p %s", shellQuote(targetPath)))
 	sess1.Close()
 
 	// Step 2.2: Upload tar.gz
-	a.emitEvent("deploy-progress",40, "Uploading source code to server...")
+	a.emitEvent("deploy-progress", 40, "Uploading source code to server...")
 	sess2, err := client.NewSession()
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error session 2")
+		record.Message = err.Error()
+		a.emitEvent("deploy-progress", 0, "Error session 2")
 		return "Error session 2: " + err.Error()
 	}
 	sess2.Stdin = bytes.NewReader(tarData)
-	err = sess2.Run(fmt.Sprintf("cat > %s/deploy.tar.gz", targetPath))
+	err = sess2.Run(fmt.Sprintf("cat > %s/deploy.tar.gz", shellQuote(targetPath)))
 	sess2.Close()
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error uploading tar.gz")
+		record.Message = err.Error()
+		a.emitEvent("deploy-progress", 0, "Error uploading tar.gz")
 		return "Error uploading tar.gz: " + err.Error()
 	}
 
 	// Step 2.3: Untar
-	a.emitEvent("deploy-progress",60, "Extracting source code on server...")
+	a.emitEvent("deploy-progress", 60, "Extracting source code on server...")
 	sess3, err := client.NewSession()
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error session 3")
+		record.Message = err.Error()
+		a.emitEvent("deploy-progress", 0, "Error session 3")
 		return "Error session 3: " + err.Error()
 	}
-	out, err := sess3.CombinedOutput(fmt.Sprintf("cd %s && tar -xzf deploy.tar.gz && rm deploy.tar.gz", targetPath))
+	out, err := sess3.CombinedOutput(fmt.Sprintf("cd %s && tar -xzf deploy.tar.gz && rm deploy.tar.gz", shellQuote(targetPath)))
 	sess3.Close()
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error extracting tar.gz")
+		record.Message = string(out) + " | " + err.Error()
+		a.emitEvent("deploy-progress", 0, "Error extracting tar.gz")
 		return "Error extracting tar.gz: " + string(out) + " | " + err.Error()
 	}
 
-	// Step 2.4: Upload .env
-	a.emitEvent("deploy-progress",70, "Writing environment configuration (.env)...")
+	// Step 2.4: Backup and upload .env
+	a.emitEvent("deploy-progress", 70, "Writing environment configuration (.env)...")
+	sessBackup, err := client.NewSession()
+	if err == nil {
+		backupCmd := fmt.Sprintf("cd %s && if [ -f .env ]; then cp .env .env.backup.$(date +%%Y%%m%%d%%H%%M%%S); fi", shellQuote(targetPath))
+		_ = sessBackup.Run(backupCmd)
+		sessBackup.Close()
+	}
+
 	sess4, err := client.NewSession()
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error session 4")
+		record.Message = err.Error()
+		a.emitEvent("deploy-progress", 0, "Error session 4")
 		return "Error session 4: " + err.Error()
 	}
 	sess4.Stdin = strings.NewReader(envContent)
-	err = sess4.Run(fmt.Sprintf("cat > %s/.env", targetPath))
+	err = sess4.Run(fmt.Sprintf("cat > %s/.env", shellQuote(targetPath)))
 	sess4.Close()
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error writing .env")
+		record.Message = err.Error()
+		a.emitEvent("deploy-progress", 0, "Error writing .env")
 		return "Error writing .env: " + err.Error()
 	}
 
 	// Step 2.5: Docker Compose
-	a.emitEvent("deploy-progress",80, "Building Docker image & starting container... (This may take a while)")
+	a.emitEvent("deploy-progress", 80, "Building Docker image & starting container... (This may take a while)")
 	sess5, err := client.NewSession()
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error session 5")
+		record.Message = err.Error()
+		a.emitEvent("deploy-progress", 0, "Error session 5")
 		return "Error session 5: " + err.Error()
 	}
 	dockerCmd := "docker compose up -d --build"
@@ -336,14 +404,17 @@ func (a *App) DeployToServer(ip, username, password, targetPath, envContent stri
 		safePass := strings.ReplaceAll(password, "'", "'\\''")
 		dockerCmd = fmt.Sprintf("echo '%s' | sudo -S docker compose up -d --build", safePass)
 	}
-	out, err = sess5.CombinedOutput(fmt.Sprintf("cd %s && %s", targetPath, dockerCmd))
+	out, err = sess5.CombinedOutput(fmt.Sprintf("cd %s && %s", shellQuote(targetPath), dockerCmd))
 	sess5.Close()
 	if err != nil {
-		a.emitEvent("deploy-progress",0, "Error docker compose")
+		record.Message = string(out) + " | " + err.Error()
+		a.emitEvent("deploy-progress", 0, "Error docker compose")
 		return "Error docker compose: " + string(out) + " | " + err.Error()
 	}
 
 	a.emitEvent("deploy-progress", 100, "Deployment successful!")
+	record.Status = "success"
+	record.Message = "Deployment successful"
 	return "Deployed successfully!\n" + string(out)
 }
 
@@ -402,7 +473,7 @@ func (a *App) StartProxyLogs(ip, username, password, targetPath string) {
 			cmd = fmt.Sprintf("echo '%s' | sudo -S docker compose logs -f --tail 100", safePass)
 		}
 
-		fullCmd := fmt.Sprintf("cd %s && %s", targetPath, cmd)
+		fullCmd := fmt.Sprintf("cd %s && %s", shellQuote(targetPath), cmd)
 
 		if err := sess.Start(fullCmd); err != nil {
 			a.emitEvent("proxy-log-line", 0, fmt.Sprintf("[Error] Failed to start command: %v", err))

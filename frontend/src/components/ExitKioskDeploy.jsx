@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowseAPKFile, DeployExitKioskAPK, ReadExitKioskConfig, UpdateExitKioskConfig } from '../../wailsjs/go/main/App';
+import { BrowseAPKFile, DeployExitKioskAPK, ReadExitKioskConfig, UpdateExitKioskConfig, ValidateExitKioskConfig, CheckADBAvailability, DiagnoseADBDevice } from '../../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 
 function ExitKioskDeploy() {
@@ -37,6 +37,7 @@ function ExitKioskDeploy() {
     const [exitKioskStatus, setExitKioskStatus] = useState('');
     const [isExitKioskDeploying, setIsExitKioskDeploying] = useState(false);
     const [exitKioskProgress, setExitKioskProgress] = useState(0);
+    const [validationReport, setValidationReport] = useState(null);
 
     useEffect(() => {
         EventsOn("exit-kiosk-progress", (data) => {
@@ -69,19 +70,35 @@ function ExitKioskDeploy() {
             alert('Local Server URL is required!');
             return;
         }
+        const payload = {
+            apkPath: exitKioskApkPath,
+            devices: exitKioskDevices.map(d => ({ ip: d.ip, deviceName: d.deviceName, gateNo: d.gateNo, plcIp: d.plcIp })),
+            ...exitKioskGlobalConfig
+        };
+        const report = await ValidateExitKioskConfig(payload);
+        setValidationReport(report);
+        if (!report.ok) {
+            alert('Please fix validation errors before deploying.');
+            return;
+        }
         setIsExitKioskDeploying(true);
         setExitKioskProgress(0);
         setExitKioskStatus('🚀 Starting Exit Kiosk deployment...');
         try {
-            await DeployExitKioskAPK({
-                apkPath: exitKioskApkPath,
-                devices: exitKioskDevices.map(d => ({ ip: d.ip, deviceName: d.deviceName, gateNo: d.gateNo, plcIp: d.plcIp })),
-                ...exitKioskGlobalConfig
-            });
+            await DeployExitKioskAPK(payload);
         } catch (e) {
             setExitKioskStatus(prev => prev + '\n❌ Error: ' + e);
         }
         setIsExitKioskDeploying(false);
+    };
+
+    const handleDiagnoseADB = async () => {
+        const adb = await CheckADBAvailability();
+        const checks = [];
+        for (const dev of exitKioskDevices) {
+            checks.push(...await DiagnoseADBDevice(dev.ip, 'com.example.exitkiosk'));
+        }
+        setExitKioskStatus([`ADB: ${adb}`, ...checks.map(c => `${c.ok ? 'OK' : 'FAIL'} ${c.name}: ${c.message} ${c.detail || ''}`)].join('\n'));
     };
 
     const handleAddReadIp = () => {
@@ -201,11 +218,17 @@ function ExitKioskDeploy() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column */}
                 <div className="lg:col-span-1 space-y-6 overflow-y-auto" style={{ maxHeight: '75vh' }}>
+                    {validationReport && !validationReport.ok && (
+                        <div className="bg-red-950/30 border border-red-900 rounded-lg p-3 text-xs text-red-300 space-y-1">
+                            {validationReport.issues.map((i, idx) => <div key={idx}>{i.field}: {i.message}</div>)}
+                        </div>
+                    )}
                     
                     {activeTab === 'install' && (
                         <>
                             <div className="flex justify-end gap-3 mb-2">
                                 <button onClick={() => setShowExitKioskModal(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-md text-xs transition-all">+ Add Device</button>
+                                <button onClick={handleDiagnoseADB} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-1.5 rounded-md text-xs transition-all">ADB Check</button>
                                 <button
                                     onClick={handleDeployExitKiosk}
                                     disabled={isExitKioskDeploying || exitKioskDevices.length === 0}

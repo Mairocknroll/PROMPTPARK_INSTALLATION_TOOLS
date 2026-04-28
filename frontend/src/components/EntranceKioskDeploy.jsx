@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowseAPKFile, DeployKioskAPK, ReadEntranceKioskConfig, UpdateEntranceKioskConfig } from '../../wailsjs/go/main/App';
+import { BrowseAPKFile, DeployKioskAPK, ReadEntranceKioskConfig, UpdateEntranceKioskConfig, ValidateEntranceKioskConfig, CheckADBAvailability, DiagnoseADBDevice } from '../../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 
 function EntranceKioskDeploy() {
@@ -34,6 +34,7 @@ function EntranceKioskDeploy() {
     const [kioskStatus, setKioskStatus] = useState('');
     const [isKioskDeploying, setIsKioskDeploying] = useState(false);
     const [kioskProgress, setKioskProgress] = useState(0);
+    const [validationReport, setValidationReport] = useState(null);
 
     useEffect(() => {
         EventsOn("kiosk-progress", (data) => {
@@ -66,20 +67,36 @@ function EntranceKioskDeploy() {
             alert('Local Server URL is required!');
             return;
         }
+        const payload = {
+            apkPath: kioskApkPath,
+            devices: kioskDevices.map(d => ({ ip: d.ip, deviceName: d.deviceName, gateNo: d.gateNo, plcIp: d.plcIp })),
+            ...kioskGlobalConfig,
+            screenTimeoutSec: parseInt(kioskGlobalConfig.screenTimeoutSec) || 10
+        };
+        const report = await ValidateEntranceKioskConfig(payload);
+        setValidationReport(report);
+        if (!report.ok) {
+            alert('Please fix validation errors before deploying.');
+            return;
+        }
         setIsKioskDeploying(true);
         setKioskProgress(0);
         setKioskStatus('🚀 Starting Kiosk deployment...');
         try {
-            await DeployKioskAPK({
-                apkPath: kioskApkPath,
-                devices: kioskDevices.map(d => ({ ip: d.ip, deviceName: d.deviceName, gateNo: d.gateNo, plcIp: d.plcIp })),
-                ...kioskGlobalConfig,
-                screenTimeoutSec: parseInt(kioskGlobalConfig.screenTimeoutSec) || 10
-            });
+            await DeployKioskAPK(payload);
         } catch (e) {
             setKioskStatus(prev => prev + '\n❌ Error: ' + e);
         }
         setIsKioskDeploying(false);
+    };
+
+    const handleDiagnoseADB = async () => {
+        const adb = await CheckADBAvailability();
+        const checks = [];
+        for (const dev of kioskDevices) {
+            checks.push(...await DiagnoseADBDevice(dev.ip, 'com.example.entrancekiosk'));
+        }
+        setKioskStatus([`ADB: ${adb}`, ...checks.map(c => `${c.ok ? 'OK' : 'FAIL'} ${c.name}: ${c.message} ${c.detail || ''}`)].join('\n'));
     };
 
     const handleAddReadIp = () => {
@@ -147,7 +164,7 @@ function EntranceKioskDeploy() {
     const handleSaveAll = async () => {
         const configsToSave = Object.values(readConfigs);
         if (configsToSave.length === 0) return;
-        
+
         let hasError = false;
         configsToSave.forEach(c => {
             if (!c.localServerUrl) hasError = true;
@@ -179,13 +196,13 @@ function EntranceKioskDeploy() {
 
             {/* Tabs */}
             <div className="flex border-b border-gray-800 mb-6 gap-6">
-                <button 
+                <button
                     onClick={() => setActiveTab('install')}
                     className={`pb-2 text-sm font-bold transition-all ${activeTab === 'install' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}
                 >
                     New Install
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('read')}
                     className={`pb-2 text-sm font-bold transition-all ${activeTab === 'read' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}
                 >
@@ -196,11 +213,17 @@ function EntranceKioskDeploy() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column Content Based on Tab */}
                 <div className="lg:col-span-1 space-y-6 overflow-y-auto" style={{ maxHeight: '75vh' }}>
-                    
+                    {validationReport && !validationReport.ok && (
+                        <div className="bg-red-950/30 border border-red-900 rounded-lg p-3 text-xs text-red-300 space-y-1">
+                            {validationReport.issues.map((i, idx) => <div key={idx}>{i.field}: {i.message}</div>)}
+                        </div>
+                    )}
+
                     {activeTab === 'install' && (
                         <>
                             <div className="flex justify-end gap-3 mb-2">
                                 <button onClick={() => setShowKioskModal(true)} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-md text-xs transition-all">+ Add Device</button>
+                                <button onClick={handleDiagnoseADB} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-1.5 rounded-md text-xs transition-all">ADB Check</button>
                                 <button
                                     onClick={handleDeployKiosk}
                                     disabled={isKioskDeploying || kioskDevices.length === 0}

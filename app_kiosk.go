@@ -67,45 +67,45 @@ type ExitKioskDeployConfig struct {
 
 // EntranceConfig holds the full config for a single Entrance Kiosk
 type EntranceConfig struct {
-	IP                 string `json:"ip"`
-	DeviceName         string `json:"deviceName"`
-	GateNo             string `json:"gateNo"`
-	PlcIP              string `json:"plcIp"`
-	ParkingCode        string `json:"parkingCode"`
-	PaymentTicket      string `json:"paymentTicket"`
-	ServerURL          string `json:"serverUrl"`
-	LocalServerURL     string `json:"localServerUrl"`
-	VehicleMode        string `json:"vehicleMode"`
-	IsSpecialEntrance  bool   `json:"isSpecialEntrance"`
-	PaymentApiVersion  string `json:"paymentApiVersion"`
-	ApiMode            string `json:"apiMode"`
-	ScreenTimeoutSec   int    `json:"screenTimeoutSec"`
-	ZoningMode         string `json:"zoningMode"`
-	ZoningCode         string `json:"zoningCode"`
-	ZoningGateNo       string `json:"zoningGateNo"`
+	IP                string `json:"ip"`
+	DeviceName        string `json:"deviceName"`
+	GateNo            string `json:"gateNo"`
+	PlcIP             string `json:"plcIp"`
+	ParkingCode       string `json:"parkingCode"`
+	PaymentTicket     string `json:"paymentTicket"`
+	ServerURL         string `json:"serverUrl"`
+	LocalServerURL    string `json:"localServerUrl"`
+	VehicleMode       string `json:"vehicleMode"`
+	IsSpecialEntrance bool   `json:"isSpecialEntrance"`
+	PaymentApiVersion string `json:"paymentApiVersion"`
+	ApiMode           string `json:"apiMode"`
+	ScreenTimeoutSec  int    `json:"screenTimeoutSec"`
+	ZoningMode        string `json:"zoningMode"`
+	ZoningCode        string `json:"zoningCode"`
+	ZoningGateNo      string `json:"zoningGateNo"`
 }
 
 // ExitConfig holds the full config for a single Exit Kiosk
 type ExitConfig struct {
-	IP                 string `json:"ip"`
-	DeviceName         string `json:"deviceName"`
-	GateNo             string `json:"gateNo"`
-	PlcIP              string `json:"plcIp"`
-	ParkingCode        string `json:"parkingCode"`
-	ProjectCode        string `json:"projectCode"`
-	PaymentTicket      string `json:"paymentTicket"`
-	ServerURL          string `json:"serverUrl"`
-	LocalServerURL     string `json:"localServerUrl"`
-	VehicleMode        string `json:"vehicleMode"`
-	ApiMode            string `json:"apiMode"`
-	ZoningMode         string `json:"zoningMode"`
-	ZoningCode         string `json:"zoningCode"`
-	ZoningGateNo       string `json:"zoningGateNo"`
-	NextZoningCode     string `json:"nextZoningCode"`
-	NextZoningGateNo   string `json:"nextZoningGateNo"`
-	IsCash             bool   `json:"isCash"`
-	IsQR               bool   `json:"isQR"`
-	TicketMode         string `json:"ticketMode"`
+	IP               string `json:"ip"`
+	DeviceName       string `json:"deviceName"`
+	GateNo           string `json:"gateNo"`
+	PlcIP            string `json:"plcIp"`
+	ParkingCode      string `json:"parkingCode"`
+	ProjectCode      string `json:"projectCode"`
+	PaymentTicket    string `json:"paymentTicket"`
+	ServerURL        string `json:"serverUrl"`
+	LocalServerURL   string `json:"localServerUrl"`
+	VehicleMode      string `json:"vehicleMode"`
+	ApiMode          string `json:"apiMode"`
+	ZoningMode       string `json:"zoningMode"`
+	ZoningCode       string `json:"zoningCode"`
+	ZoningGateNo     string `json:"zoningGateNo"`
+	NextZoningCode   string `json:"nextZoningCode"`
+	NextZoningGateNo string `json:"nextZoningGateNo"`
+	IsCash           bool   `json:"isCash"`
+	IsQR             bool   `json:"isQR"`
+	TicketMode       string `json:"ticketMode"`
 }
 
 // findADB auto-detects adb.exe from PATH or ANDROID_HOME
@@ -153,6 +153,11 @@ func (a *App) BrowseAPKFile() string {
 
 // DeployKioskAPK installs APK and pushes SharedPreferences to multiple Android devices
 func (a *App) DeployKioskAPK(config KioskDeployConfig) {
+	if report := a.ValidateEntranceKioskConfig(config); !report.OK {
+		a.emitEvent("kiosk-progress", 0, "Validation failed: "+formatValidationIssues(report))
+		return
+	}
+
 	adbPath, err := findADB()
 	if err != nil {
 		a.emitEvent("kiosk-progress", 0, "❌ "+err.Error())
@@ -162,7 +167,7 @@ func (a *App) DeployKioskAPK(config KioskDeployConfig) {
 
 	total := len(config.Devices)
 	for i, dev := range config.Devices {
-		progress := int((float64(i) / float64(total)) * 90) + 5
+		progress := int((float64(i)/float64(total))*90) + 5
 		devAddr := dev.IP + ":5555"
 
 		// Step 1: ADB connect
@@ -287,7 +292,7 @@ func (a *App) ReadEntranceKioskConfig(ip string) (map[string]string, error) {
 
 	// Parse XML (simple string parsing since it's a flat map of strings and booleans)
 	result := make(map[string]string)
-	
+
 	lines := strings.Split(xmlData, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -323,6 +328,11 @@ func (a *App) ReadEntranceKioskConfig(ip string) (map[string]string, error) {
 
 // DeployExitKioskAPK automates ADB installation and Exit Kiosk SharedPreferences config push
 func (a *App) DeployExitKioskAPK(config ExitKioskDeployConfig) {
+	if report := a.ValidateExitKioskConfig(config); !report.OK {
+		a.emitEvent("exit-kiosk-progress", 0, "Validation failed: "+formatValidationIssues(report))
+		return
+	}
+
 	adbPath, err := findADB()
 	if err != nil {
 		a.emitEvent("exit-kiosk-progress", 0, "❌ Error: ADB not found! Please install Android platform-tools.")
@@ -466,7 +476,7 @@ func (a *App) ReadExitKioskConfig(ip string) (map[string]string, error) {
 
 	// Parse XML
 	result := make(map[string]string)
-	
+
 	lines := strings.Split(xmlData, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)

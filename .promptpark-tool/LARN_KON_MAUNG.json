@@ -1,0 +1,77 @@
+{
+  "name": "LARN_KON_MAUNG",
+  "updatedAt": "2026-04-28T20:42:03+07:00",
+  "data": {
+    "id": "LARN_KON_MAUNG-1777380485023",
+    "name": "LARN_KON_MAUNG",
+    "system": {
+      "SERVER_URL": "https://api-pms.jparkdev.co",
+      "PARKING_CODE": "la26010038",
+      "ADDR": "0.0.0.0:8000",
+      "CAMERA_USER": "admin",
+      "CAMERA_PASS": "Jp@rk1ng",
+      "MODBUS_PORT": "504",
+      "MODBUS_TIMEOUT_MS": "2000",
+      "MODBUS_PULSE_MS": "500",
+      "MODBUS_SLAVE_ID": "1"
+    },
+    "lanes": [
+      {
+        "id": "ENT-01-1777383723430",
+        "type": "ENT",
+        "number": "01",
+        "gateIp": "10.10.34.10",
+        "lprIp": "10.10.34.30",
+        "licIp": "10.10.34.40",
+        "driIp": "10.10.34.50",
+        "hasLed": true,
+        "ledIp": "10.10.34.90"
+      },
+      {
+        "id": "EXT-01-1777383723430",
+        "type": "EXT",
+        "number": "01",
+        "gateIp": "10.10.34.11",
+        "lprIp": "10.10.34.31",
+        "licIp": "10.10.34.41",
+        "driIp": "10.10.34.41",
+        "hasLed": true,
+        "ledIp": "10.10.34.91"
+      },
+      {
+        "id": "ENT-02-1777383723430",
+        "type": "ENT",
+        "number": "02",
+        "gateIp": "10.10.34.12",
+        "lprIp": "10.10.34.32",
+        "licIp": "10.10.34.42",
+        "driIp": "10.10.34.52",
+        "hasLed": true,
+        "ledIp": "10.10.34.92"
+      },
+      {
+        "id": "EXT-02-1777383723430",
+        "type": "EXT",
+        "number": "02",
+        "gateIp": "10.10.34.13",
+        "lprIp": "10.10.34.33",
+        "licIp": "10.10.34.43",
+        "driIp": "10.10.34.43",
+        "hasLed": true,
+        "ledIp": "10.10.34.93"
+      }
+    ],
+    "serverConfig": {
+      "ip": "10.10.34.2",
+      "username": "jpark",
+      "password": "",
+      "targetPath": "/home/jpark/go_local_proxy_api"
+    },
+    "status": {
+      "lastDeployStatus": "loaded",
+      "lastDeployAt": "",
+      "lastHealthcheckAt": "",
+      "lastHealthcheckStatus": ""
+    }
+  }
+}

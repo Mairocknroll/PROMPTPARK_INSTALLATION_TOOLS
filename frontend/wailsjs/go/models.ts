@@ -1,5 +1,27 @@
 export namespace main {
 	
+	export class DeploymentHistoryRecord {
+	    timestamp: string;
+	    server: string;
+	    targetPath: string;
+	    status: string;
+	    message: string;
+	    envContent: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DeploymentHistoryRecord(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.timestamp = source["timestamp"];
+	        this.server = source["server"];
+	        this.targetPath = source["targetPath"];
+	        this.status = source["status"];
+	        this.message = source["message"];
+	        this.envContent = source["envContent"];
+	    }
+	}
 	export class EntranceConfig {
 	    ip: string;
 	    deviceName: string;
@@ -225,6 +247,22 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class InstallationProfile {
+	    name: string;
+	    updatedAt: string;
+	    data: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new InstallationProfile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.updatedAt = source["updatedAt"];
+	        this.data = source["data"];
+	    }
+	}
 	export class KioskDevice {
 	    ip: string;
 	    deviceName: string;
@@ -279,6 +317,75 @@ export namespace main {
 	        this.zoningMode = source["zoningMode"];
 	        this.zoningCode = source["zoningCode"];
 	        this.zoningGateNo = source["zoningGateNo"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class PreflightCheck {
+	    name: string;
+	    ok: boolean;
+	    message: string;
+	    detail: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new PreflightCheck(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.ok = source["ok"];
+	        this.message = source["message"];
+	        this.detail = source["detail"];
+	    }
+	}
+	export class ValidationIssue {
+	    field: string;
+	    message: string;
+	    level: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ValidationIssue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.field = source["field"];
+	        this.message = source["message"];
+	        this.level = source["level"];
+	    }
+	}
+	export class ValidationReport {
+	    ok: boolean;
+	    issues: ValidationIssue[];
+	    warnings: ValidationIssue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ValidationReport(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ok = source["ok"];
+	        this.issues = this.convertValues(source["issues"], ValidationIssue);
+	        this.warnings = this.convertValues(source["warnings"], ValidationIssue);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

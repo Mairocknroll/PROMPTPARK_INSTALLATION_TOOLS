@@ -28,6 +28,11 @@ type HikvisionConfig struct {
 
 // ConfigureHikvisionISAPI connects to each camera via Digest Auth and sets the HTTP Host
 func (a *App) ConfigureHikvisionISAPI(config HikvisionConfig) {
+	if report := a.ValidateHikvisionConfig(config); !report.OK {
+		a.emitEvent("hik-progress", 0, "Validation failed: "+formatValidationIssues(report))
+		return
+	}
+
 	for i, cam := range config.Cameras {
 		progress := int((float64(i) / float64(len(config.Cameras))) * 100)
 		a.emitEvent("hik-progress", progress, fmt.Sprintf("Configuring %s...", cam.IP))
