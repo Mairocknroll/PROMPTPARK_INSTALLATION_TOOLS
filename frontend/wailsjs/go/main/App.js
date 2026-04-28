@@ -49,3 +49,7 @@ export function SaveEnvConfig(arg1) {
 export function SaveRemoteEnv(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['SaveRemoteEnv'](arg1, arg2, arg3, arg4, arg5);
 }
+
+export function SendMockCameraEvent(arg1, arg2) {
+  return window['go']['main']['App']['SendMockCameraEvent'](arg1, arg2);
+}
