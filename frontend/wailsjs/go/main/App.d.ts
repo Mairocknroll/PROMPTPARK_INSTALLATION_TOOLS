@@ -32,6 +32,10 @@ export function SaveRemoteEnv(arg1:string,arg2:string,arg3:string,arg4:string,ar
 
 export function SendMockCameraEvent(arg1:string,arg2:string):Promise<string>;
 
+export function StartProxyLogs(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
+export function StopProxyLogs():Promise<void>;
+
 export function UpdateEntranceKioskConfig(arg1:Array<main.EntranceConfig>):Promise<void>;
 
 export function UpdateExitKioskConfig(arg1:Array<main.ExitConfig>):Promise<void>;

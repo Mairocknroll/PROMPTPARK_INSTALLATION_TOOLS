@@ -492,7 +492,7 @@ function ExitKioskDeploy() {
                                 </div>
                             </div>
                         )}
-                        <pre className="text-[11px] text-green-400 font-mono whitespace-pre-wrap leading-5 flex-1 overflow-y-auto bg-black/50 p-3 rounded border border-gray-800/50">
+                        <pre className="text-[11px] text-green-400 font-mono whitespace-pre-wrap leading-5 flex-1 overflow-y-auto bg-black/50 p-3 rounded border border-gray-800/50 text-left">
                             {exitKioskStatus || 'Waiting for action...'}
                         </pre>
                     </div>

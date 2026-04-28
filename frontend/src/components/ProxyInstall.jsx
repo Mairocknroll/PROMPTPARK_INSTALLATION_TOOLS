@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { SaveEnvConfig, CheckSSHConnection, ReadRemoteEnv, SaveRemoteEnv, RedeployProxy, DeployToServer, CheckPortInUse } from '../../wailsjs/go/main/App';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { SaveEnvConfig, CheckSSHConnection, ReadRemoteEnv, SaveRemoteEnv, RedeployProxy, DeployToServer, CheckPortInUse, StartProxyLogs, StopProxyLogs } from '../../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 
 function ProxyInstall() {
     const [step, setStep] = useState(1);
-    const [proxyTab, setProxyTab] = useState('new'); // 'new' or 'edit'
+    const [proxyTab, setProxyTab] = useState('new'); // 'new', 'edit', or 'logs'
     const [showModal, setShowModal] = useState(false);
 
     const [system, setSystem] = useState({
@@ -34,6 +34,11 @@ function ProxyInstall() {
     const [deployProgress, setDeployProgress] = useState(0);
     const [isConnectionTested, setIsConnectionTested] = useState(false);
 
+    // Logs state
+    const [proxyLogs, setProxyLogs] = useState('');
+    const [isStreamingLogs, setIsStreamingLogs] = useState(false);
+    const logsEndRef = useRef(null);
+
     useEffect(() => {
         setIsConnectionTested(false);
     }, [serverConfig.ip, serverConfig.username, serverConfig.password]);
@@ -43,10 +48,22 @@ function ProxyInstall() {
             setDeployProgress(data.progress);
             setDeployStatus(prev => prev + '\n⏳ [' + data.progress + '%] ' + data.message);
         });
+        
+        EventsOn("proxy-log-line", (data) => {
+            setProxyLogs(prev => prev + '\n' + data.message);
+        });
+
         return () => {
             EventsOff("deploy-progress");
+            EventsOff("proxy-log-line");
         };
     }, []);
+
+    useEffect(() => {
+        if (proxyTab === 'logs' && logsEndRef.current) {
+            logsEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+    }, [proxyLogs, proxyTab]);
 
     const parseEnvToState = (envString) => {
         const lines = envString.split('\n');
@@ -258,12 +275,27 @@ function ProxyInstall() {
         setIsDeploying(false);
     };
 
+    const handleStartLogs = async () => {
+        if (!serverConfig.ip || !serverConfig.username || !serverConfig.password || !serverConfig.targetPath) {
+            alert("Please fill in all server details.");
+            return;
+        }
+        setProxyLogs('🔌 Connecting to server and starting log stream...');
+        setIsStreamingLogs(true);
+        await StartProxyLogs(serverConfig.ip, serverConfig.username, serverConfig.password, serverConfig.targetPath);
+    };
+
+    const handleStopLogs = async () => {
+        await StopProxyLogs();
+        setIsStreamingLogs(false);
+    };
+
     return (
         <>
             <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
                 <div>
                     <h2 className="text-2xl font-bold text-white">Local Proxy API</h2>
-                    <p className="text-xs text-gray-500 mt-1">Manage local proxy installation and configuration</p>
+                    <p className="text-xs text-gray-500 mt-1">Manage local proxy installation, configuration, and logs</p>
                 </div>
                 <div className="flex bg-[#090c10] p-1 rounded-lg border border-gray-800">
                     <button
@@ -277,6 +309,12 @@ function ProxyInstall() {
                         className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${proxyTab === 'edit' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
                     >
                         Edit (Revise)
+                    </button>
+                    <button
+                        onClick={() => { setProxyTab('logs'); }}
+                        className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${proxyTab === 'logs' ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        View Logs
                     </button>
                 </div>
             </div>
@@ -347,7 +385,7 @@ function ProxyInstall() {
                     {/* Right: Live Preview */}
                     <div className="bg-[#090c10] border border-gray-800 rounded-lg p-5 h-[70vh] overflow-y-auto sticky top-8">
                         <h2 className="text-[10px] text-gray-500 uppercase tracking-widest mb-4">Live .env Preview</h2>
-                        <pre className="text-[11px] text-green-500 font-mono whitespace-pre-wrap leading-5">
+                        <pre className="text-[11px] text-green-500 font-mono whitespace-pre-wrap leading-5 text-left">
                             {envContent}
                         </pre>
                     </div>
@@ -427,7 +465,7 @@ function ProxyInstall() {
                                 </div>
                             )}
 
-                            <pre className="text-[11px] text-green-400 font-mono whitespace-pre-wrap leading-5 flex-1 overflow-y-auto bg-black/50 p-3 rounded border border-gray-800/50">
+                            <pre className="text-[11px] text-green-400 font-mono whitespace-pre-wrap leading-5 flex-1 overflow-y-auto bg-black/50 p-3 rounded border border-gray-800/50 text-left">
                                 {deployStatus || "Waiting to deploy..."}
                             </pre>
                         </div>
@@ -549,12 +587,92 @@ function ProxyInstall() {
 
                             <div className="bg-[#090c10] border border-gray-800 rounded-lg p-5 h-[70vh] overflow-y-auto sticky top-8">
                                 <h2 className="text-[10px] text-gray-500 uppercase tracking-widest mb-4">Live .env Preview</h2>
-                                <pre className="text-[11px] text-green-500 font-mono whitespace-pre-wrap leading-5">
+                                <pre className="text-[11px] text-green-500 font-mono whitespace-pre-wrap leading-5 text-left">
                                     {envContent}
                                 </pre>
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {proxyTab === 'logs' && (
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                    <div className="lg:col-span-1 space-y-6">
+                        <div className="bg-[#161b22] border border-gray-800 rounded-lg p-5">
+                            <h2 className="text-blue-400 text-xs font-bold uppercase mb-4 tracking-tighter">Docker Compose Logs</h2>
+                            <p className="text-xs text-gray-400 mb-4">Connect to the remote server and stream live logs directly from the Docker container.</p>
+                            
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-[10px] text-gray-500 block mb-1">Server IP</label>
+                                    <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1.5 text-sm" value={serverConfig.ip} onChange={e => setServerConfig({ ...serverConfig, ip: e.target.value })} placeholder="192.168.1.100" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-500 block mb-1">Username</label>
+                                    <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1.5 text-sm" value={serverConfig.username} onChange={e => setServerConfig({ ...serverConfig, username: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-500 block mb-1">Password</label>
+                                    <input type="password" className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1.5 text-sm" value={serverConfig.password} onChange={e => setServerConfig({ ...serverConfig, password: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-gray-500 block mb-1">Target Directory (Project Path)</label>
+                                    <input className="w-full bg-[#0d1117] border border-gray-800 rounded px-2 py-1.5 text-sm text-yellow-500" value={serverConfig.targetPath} onChange={e => setServerConfig({ ...serverConfig, targetPath: e.target.value })} />
+                                </div>
+
+                                <div className="pt-4 flex gap-2">
+                                    {!isStreamingLogs ? (
+                                        <button 
+                                            onClick={handleStartLogs} 
+                                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded text-xs transition-all flex justify-center items-center gap-2"
+                                        >
+                                            <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                                            Start Streaming Logs
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={handleStopLogs} 
+                                            className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded text-xs transition-all flex justify-center items-center gap-2"
+                                        >
+                                            <span className="w-2 h-2 rounded-full bg-red-300"></span>
+                                            Stop Streaming
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="lg:col-span-3">
+                        <div className="bg-[#090c10] border border-gray-800 rounded-lg p-5 h-[75vh] flex flex-col relative group">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-[10px] text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                                    Terminal Output
+                                    {isStreamingLogs && <span className="text-[10px] text-green-400 bg-green-900/30 px-2 py-0.5 rounded animate-pulse">LIVE</span>}
+                                </h2>
+                                <button 
+                                    onClick={() => setProxyLogs('')} 
+                                    className="text-[10px] text-gray-500 hover:text-gray-300 bg-gray-800 px-2 py-1 rounded transition-all"
+                                >
+                                    Clear Logs
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto bg-black p-4 rounded border border-gray-800 font-mono text-[11px] leading-5 text-gray-300 scroll-smooth">
+                                {proxyLogs ? (
+                                    <pre className="whitespace-pre-wrap font-mono text-left">
+                                        {proxyLogs}
+                                    </pre>
+                                ) : (
+                                    <div className="flex h-full items-center justify-center text-gray-600 italic">
+                                        No logs to display. Click "Start Streaming Logs" to begin.
+                                    </div>
+                                )}
+                                <div ref={logsEndRef} />
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 

@@ -62,6 +62,14 @@ export function SendMockCameraEvent(arg1, arg2) {
   return window['go']['main']['App']['SendMockCameraEvent'](arg1, arg2);
 }
 
+export function StartProxyLogs(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['StartProxyLogs'](arg1, arg2, arg3, arg4);
+}
+
+export function StopProxyLogs() {
+  return window['go']['main']['App']['StopProxyLogs']();
+}
+
 export function UpdateEntranceKioskConfig(arg1) {
   return window['go']['main']['App']['UpdateEntranceKioskConfig'](arg1);
 }

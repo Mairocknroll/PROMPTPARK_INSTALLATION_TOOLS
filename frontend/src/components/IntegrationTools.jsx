@@ -81,7 +81,7 @@ function IntegrationTools() {
                 
                 <div className="bg-[#090c10] border border-gray-800 rounded-lg p-5 h-[65vh] flex flex-col">
                     <h2 className="text-[10px] text-gray-500 uppercase tracking-widest mb-4">Response Detail</h2>
-                    <pre className="text-[11px] text-green-400 font-mono whitespace-pre-wrap leading-5 flex-1 overflow-y-auto bg-black/50 p-4 rounded border border-gray-800/50 break-all">
+                    <pre className="text-[11px] text-green-400 font-mono whitespace-pre-wrap leading-5 flex-1 overflow-y-auto bg-black/50 p-4 rounded border border-gray-800/50 break-all text-left">
                         {mockResponse || 'Awaiting request...'}
                     </pre>
                 </div>

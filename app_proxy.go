@@ -2,8 +2,10 @@ package main
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"embed"
 	"fmt"
 	"io/fs"
@@ -13,6 +15,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 )
+
+var proxyLogCancel context.CancelFunc
 
 //go:embed proxy_api_template
 var proxyAPI embed.FS
@@ -341,4 +345,100 @@ func (a *App) DeployToServer(ip, username, password, targetPath, envContent stri
 
 	a.emitEvent("deploy-progress", 100, "Deployment successful!")
 	return "Deployed successfully!\n" + string(out)
+}
+
+// StartProxyLogs starts an SSH session, runs docker compose logs -f, and streams output via Wails events.
+func (a *App) StartProxyLogs(ip, username, password, targetPath string) {
+	a.StopProxyLogs()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	proxyLogCancel = cancel
+
+	if !strings.Contains(ip, ":") {
+		ip = ip + ":22"
+	}
+
+	go func() {
+		defer a.emitEvent("proxy-log-line", 0, "\n[System] Log stream ended.")
+
+		config := &ssh.ClientConfig{
+			User: username,
+			Auth: []ssh.AuthMethod{
+				ssh.Password(password),
+			},
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			Timeout:         10 * time.Second,
+		}
+
+		client, err := ssh.Dial("tcp", ip, config)
+		if err != nil {
+			a.emitEvent("proxy-log-line", 0, fmt.Sprintf("[Error] Failed to connect SSH: %v", err))
+			return
+		}
+		defer client.Close()
+
+		sess, err := client.NewSession()
+		if err != nil {
+			a.emitEvent("proxy-log-line", 0, fmt.Sprintf("[Error] Failed to create session: %v", err))
+			return
+		}
+		defer sess.Close()
+
+		stdout, err := sess.StdoutPipe()
+		if err != nil {
+			a.emitEvent("proxy-log-line", 0, fmt.Sprintf("[Error] Failed to pipe stdout: %v", err))
+			return
+		}
+
+		stderr, err := sess.StderrPipe()
+		if err != nil {
+			a.emitEvent("proxy-log-line", 0, fmt.Sprintf("[Error] Failed to pipe stderr: %v", err))
+			return
+		}
+
+		cmd := "docker compose logs -f --tail 100"
+		if username != "root" {
+			safePass := strings.ReplaceAll(password, "'", "'\\''")
+			cmd = fmt.Sprintf("echo '%s' | sudo -S docker compose logs -f --tail 100", safePass)
+		}
+
+		fullCmd := fmt.Sprintf("cd %s && %s", targetPath, cmd)
+
+		if err := sess.Start(fullCmd); err != nil {
+			a.emitEvent("proxy-log-line", 0, fmt.Sprintf("[Error] Failed to start command: %v", err))
+			return
+		}
+
+		done := make(chan struct{})
+
+		go func() {
+			scanner := bufio.NewScanner(stdout)
+			for scanner.Scan() {
+				a.emitEvent("proxy-log-line", 0, scanner.Text())
+			}
+			done <- struct{}{}
+		}()
+
+		go func() {
+			scanner := bufio.NewScanner(stderr)
+			for scanner.Scan() {
+				a.emitEvent("proxy-log-line", 0, "[Err] "+scanner.Text())
+			}
+			done <- struct{}{}
+		}()
+
+		select {
+		case <-ctx.Done():
+			sess.Signal(ssh.SIGINT)
+			sess.Close()
+		case <-done:
+		}
+	}()
+}
+
+func (a *App) StopProxyLogs() {
+	if proxyLogCancel != nil {
+		proxyLogCancel()
+		proxyLogCancel = nil
+	}
 }
