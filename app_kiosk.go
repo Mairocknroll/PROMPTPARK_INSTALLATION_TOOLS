@@ -65,6 +65,49 @@ type ExitKioskDeployConfig struct {
 	TicketMode       string            `json:"ticketMode"`
 }
 
+// EntranceConfig holds the full config for a single Entrance Kiosk
+type EntranceConfig struct {
+	IP                 string `json:"ip"`
+	DeviceName         string `json:"deviceName"`
+	GateNo             string `json:"gateNo"`
+	PlcIP              string `json:"plcIp"`
+	ParkingCode        string `json:"parkingCode"`
+	PaymentTicket      string `json:"paymentTicket"`
+	ServerURL          string `json:"serverUrl"`
+	LocalServerURL     string `json:"localServerUrl"`
+	VehicleMode        string `json:"vehicleMode"`
+	IsSpecialEntrance  bool   `json:"isSpecialEntrance"`
+	PaymentApiVersion  string `json:"paymentApiVersion"`
+	ApiMode            string `json:"apiMode"`
+	ScreenTimeoutSec   int    `json:"screenTimeoutSec"`
+	ZoningMode         string `json:"zoningMode"`
+	ZoningCode         string `json:"zoningCode"`
+	ZoningGateNo       string `json:"zoningGateNo"`
+}
+
+// ExitConfig holds the full config for a single Exit Kiosk
+type ExitConfig struct {
+	IP                 string `json:"ip"`
+	DeviceName         string `json:"deviceName"`
+	GateNo             string `json:"gateNo"`
+	PlcIP              string `json:"plcIp"`
+	ParkingCode        string `json:"parkingCode"`
+	ProjectCode        string `json:"projectCode"`
+	PaymentTicket      string `json:"paymentTicket"`
+	ServerURL          string `json:"serverUrl"`
+	LocalServerURL     string `json:"localServerUrl"`
+	VehicleMode        string `json:"vehicleMode"`
+	ApiMode            string `json:"apiMode"`
+	ZoningMode         string `json:"zoningMode"`
+	ZoningCode         string `json:"zoningCode"`
+	ZoningGateNo       string `json:"zoningGateNo"`
+	NextZoningCode     string `json:"nextZoningCode"`
+	NextZoningGateNo   string `json:"nextZoningGateNo"`
+	IsCash             bool   `json:"isCash"`
+	IsQR               bool   `json:"isQR"`
+	TicketMode         string `json:"ticketMode"`
+}
+
 // findADB auto-detects adb.exe from PATH or ANDROID_HOME
 func findADB() (string, error) {
 	// 1. Try PATH
@@ -215,6 +258,69 @@ func (a *App) DeployKioskAPK(config KioskDeployConfig) {
 	a.emitEvent("kiosk-progress", 100, "✅ Done deploying to all devices.")
 }
 
+// ReadEntranceKioskConfig connects to the device via ADB and reads the SharedPreferences XML
+func (a *App) ReadEntranceKioskConfig(ip string) (map[string]string, error) {
+	adbPath, err := findADB()
+	if err != nil {
+		return nil, fmt.Errorf("ADB not found: %v", err)
+	}
+
+	devAddr := ip + ":5555"
+
+	// Connect
+	exec.Command(adbPath, "connect", devAddr).Run()
+
+	// Verify connection
+	out, _ := exec.Command(adbPath, "devices").CombinedOutput()
+	if !strings.Contains(string(out), devAddr) {
+		return nil, fmt.Errorf("failed to connect to %s", ip)
+	}
+
+	// Read shared_prefs via run-as
+	out, err = exec.Command(adbPath, "-s", devAddr, "shell",
+		"run-as com.example.entrancekiosk cat shared_prefs/PromptParkConfiguration.xml").CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config on %s (is the app installed?): %s", ip, string(out))
+	}
+
+	xmlData := string(out)
+
+	// Parse XML (simple string parsing since it's a flat map of strings and booleans)
+	result := make(map[string]string)
+	
+	lines := strings.Split(xmlData, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "<string name=\"") {
+			parts := strings.SplitN(line, "\"", 3)
+			if len(parts) >= 3 {
+				key := parts[1]
+				valParts := strings.SplitN(parts[2], ">", 2)
+				if len(valParts) >= 2 {
+					val := strings.SplitN(valParts[1], "<", 2)[0]
+					result[key] = val
+				}
+			}
+		} else if strings.HasPrefix(line, "<boolean name=\"") {
+			parts := strings.Split(line, "\"")
+			if len(parts) >= 5 {
+				key := parts[1]
+				val := parts[3]
+				result[key] = val
+			}
+		} else if strings.HasPrefix(line, "<long name=\"") {
+			parts := strings.Split(line, "\"")
+			if len(parts) >= 5 {
+				key := parts[1]
+				val := parts[3]
+				result[key] = val
+			}
+		}
+	}
+
+	return result, nil
+}
+
 // DeployExitKioskAPK automates ADB installation and Exit Kiosk SharedPreferences config push
 func (a *App) DeployExitKioskAPK(config ExitKioskDeployConfig) {
 	adbPath, err := findADB()
@@ -329,4 +435,227 @@ func (a *App) DeployExitKioskAPK(config ExitKioskDeployConfig) {
 	}
 
 	a.emitEvent("exit-kiosk-progress", 100, "✅ Done deploying to all devices.")
+}
+
+// ReadExitKioskConfig connects to the device via ADB and reads the Exit Kiosk SharedPreferences XML
+func (a *App) ReadExitKioskConfig(ip string) (map[string]string, error) {
+	adbPath, err := findADB()
+	if err != nil {
+		return nil, fmt.Errorf("ADB not found: %v", err)
+	}
+
+	devAddr := ip + ":5555"
+
+	// Connect
+	exec.Command(adbPath, "connect", devAddr).Run()
+
+	// Verify connection
+	out, _ := exec.Command(adbPath, "devices").CombinedOutput()
+	if !strings.Contains(string(out), devAddr) {
+		return nil, fmt.Errorf("failed to connect to %s", ip)
+	}
+
+	// Read shared_prefs via run-as
+	out, err = exec.Command(adbPath, "-s", devAddr, "shell",
+		"run-as com.example.exitkiosk cat shared_prefs/PromptParkConfiguration.xml").CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config on %s (is the app installed?): %s", ip, string(out))
+	}
+
+	xmlData := string(out)
+
+	// Parse XML
+	result := make(map[string]string)
+	
+	lines := strings.Split(xmlData, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "<string name=\"") {
+			parts := strings.SplitN(line, "\"", 3)
+			if len(parts) >= 3 {
+				key := parts[1]
+				valParts := strings.SplitN(parts[2], ">", 2)
+				if len(valParts) >= 2 {
+					val := strings.SplitN(valParts[1], "<", 2)[0]
+					result[key] = val
+				}
+			}
+		} else if strings.HasPrefix(line, "<boolean name=\"") {
+			parts := strings.Split(line, "\"")
+			if len(parts) >= 5 {
+				key := parts[1]
+				val := parts[3]
+				result[key] = val
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// UpdateEntranceKioskConfig pushes XML to multiple devices without installing the APK
+func (a *App) UpdateEntranceKioskConfig(configs []EntranceConfig) {
+	adbPath, err := findADB()
+	if err != nil {
+		a.emitEvent("kiosk-progress", 0, "❌ "+err.Error())
+		return
+	}
+
+	total := len(configs)
+	for i, dev := range configs {
+		progress := int((float64(i) / float64(total)) * 100)
+		devAddr := dev.IP + ":5555"
+
+		a.emitEvent("kiosk-progress", progress, fmt.Sprintf("📡 Connecting to %s (%s)...", dev.DeviceName, dev.IP))
+		out, err := exec.Command(adbPath, "connect", devAddr).CombinedOutput()
+		if err != nil {
+			a.emitEvent("kiosk-progress", progress, fmt.Sprintf("❌ Failed to connect %s: %s", dev.IP, string(out)))
+			continue
+		}
+
+		a.emitEvent("kiosk-progress", progress+2, fmt.Sprintf("⚙️ Writing SharedPreferences on %s...", dev.DeviceName))
+
+		isSpecial := "false"
+		if dev.IsSpecialEntrance {
+			isSpecial = "true"
+		}
+
+		xmlContent := fmt.Sprintf(`<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="deviceNameConfig">%s</string>
+    <string name="parkingCodeConfig">%s</string>
+    <string name="paymentTicket">%s</string>
+    <string name="serverConfig">%s</string>
+    <string name="localServerConfig">%s</string>
+    <string name="plcIpConfig">%s</string>
+    <string name="gateConfig">%s</string>
+    <string name="vehicleMode">%s</string>
+    <boolean name="isSpecialEntrance" value="%s" />
+    <string name="paymentApiVersionConfig">%s</string>
+    <string name="zoningMode">%s</string>
+    <string name="zoningCode">%s</string>
+    <string name="zoningGateNo">%s</string>
+    <string name="apiMode">%s</string>
+    <long name="setTime" value="%d" />
+</map>`,
+			dev.DeviceName, dev.ParkingCode, dev.PaymentTicket,
+			dev.ServerURL, dev.LocalServerURL, dev.PlcIP,
+			dev.GateNo, dev.VehicleMode, isSpecial,
+			dev.PaymentApiVersion, dev.ZoningMode,
+			dev.ZoningCode, dev.ZoningGateNo,
+			dev.ApiMode, dev.ScreenTimeoutSec*1000,
+		)
+
+		tmpFile, err := os.CreateTemp("", "prefs-*.xml")
+		if err != nil {
+			a.emitEvent("kiosk-progress", progress, fmt.Sprintf("❌ Failed to create temp file: %v", err))
+			continue
+		}
+		tmpFile.WriteString(xmlContent)
+		tmpFile.Close()
+
+		out, err = exec.Command(adbPath, "-s", devAddr, "push", tmpFile.Name(), "/data/local/tmp/prefs.xml").CombinedOutput()
+		os.Remove(tmpFile.Name())
+		if err != nil {
+			a.emitEvent("kiosk-progress", progress, fmt.Sprintf("❌ Failed to push prefs to %s: %s", dev.IP, string(out)))
+			continue
+		}
+
+		out, err = exec.Command(adbPath, "-s", devAddr, "shell",
+			"run-as com.example.entrancekiosk cp /data/local/tmp/prefs.xml shared_prefs/PromptParkConfiguration.xml").CombinedOutput()
+		if err != nil {
+			a.emitEvent("kiosk-progress", progress, fmt.Sprintf("⚠️ run-as cp failed on %s: %s", dev.IP, string(out)))
+			continue
+		}
+
+		exec.Command(adbPath, "-s", devAddr, "shell", "run-as com.example.entrancekiosk chmod 660 shared_prefs/PromptParkConfiguration.xml").Run()
+		exec.Command(adbPath, "-s", devAddr, "shell", "rm /data/local/tmp/prefs.xml").Run()
+
+		a.emitEvent("kiosk-progress", progress+5, fmt.Sprintf("✅ Config pushed to %s", dev.DeviceName))
+	}
+
+	a.emitEvent("kiosk-progress", 100, "✅ Done saving to all devices.")
+}
+
+// UpdateExitKioskConfig pushes XML to multiple devices without installing the APK
+func (a *App) UpdateExitKioskConfig(configs []ExitConfig) {
+	adbPath, err := findADB()
+	if err != nil {
+		a.emitEvent("exit-kiosk-progress", 0, "❌ Error: ADB not found!")
+		return
+	}
+
+	total := len(configs)
+	for i, dev := range configs {
+		progress := int((float64(i) / float64(total)) * 100)
+		devAddr := dev.IP + ":5555"
+
+		a.emitEvent("exit-kiosk-progress", progress, fmt.Sprintf("📡 Connecting to %s (%s)...", dev.DeviceName, dev.IP))
+		exec.Command(adbPath, "connect", devAddr).Run()
+
+		out, _ := exec.Command(adbPath, "devices").CombinedOutput()
+		if !strings.Contains(string(out), devAddr) {
+			a.emitEvent("exit-kiosk-progress", progress, fmt.Sprintf("❌ Failed to connect to %s", dev.IP))
+			continue
+		}
+
+		a.emitEvent("exit-kiosk-progress", progress+2, fmt.Sprintf("⚙️ Writing SharedPreferences on %s...", dev.DeviceName))
+
+		xmlContent := fmt.Sprintf(`<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
+<map>
+    <string name="deviceNameConfig">%s</string>
+    <string name="parkingCodeConfig">%s</string>
+    <string name="projectCodeConfig">%s</string>
+    <string name="paymentTicket">%s</string>
+    <string name="serverConfig">%s</string>
+    <string name="localServerConfig">%s</string>
+    <string name="plcIpConfig">%s</string>
+    <string name="gateConfig">%s</string>
+    <string name="vehicleMode">%s</string>
+    <string name="apiMode">%s</string>
+    <string name="zoningMode">%s</string>
+    <string name="zoningCode">%s</string>
+    <string name="zoningGateNo">%s</string>
+    <string name="nextZoningCode">%s</string>
+    <string name="nextZoningGateNo">%s</string>
+    <boolean name="isCash" value="%t" />
+    <boolean name="isQR" value="%t" />
+    <string name="ticketMode">%s</string>
+</map>`,
+			dev.DeviceName, dev.ParkingCode, dev.ProjectCode, dev.PaymentTicket,
+			dev.ServerURL, dev.LocalServerURL, dev.PlcIP,
+			dev.GateNo, dev.VehicleMode, dev.ApiMode, dev.ZoningMode,
+			dev.ZoningCode, dev.ZoningGateNo, dev.NextZoningCode, dev.NextZoningGateNo,
+			dev.IsCash, dev.IsQR, dev.TicketMode,
+		)
+
+		tmpFile, err := os.CreateTemp("", "exit-prefs-*.xml")
+		if err != nil {
+			a.emitEvent("exit-kiosk-progress", progress, fmt.Sprintf("❌ Failed to create temp file: %v", err))
+			continue
+		}
+		tmpFile.WriteString(xmlContent)
+		tmpFile.Close()
+
+		out, err = exec.Command(adbPath, "-s", devAddr, "push", tmpFile.Name(), "/data/local/tmp/prefs.xml").CombinedOutput()
+		os.Remove(tmpFile.Name())
+		if err != nil {
+			a.emitEvent("exit-kiosk-progress", progress, fmt.Sprintf("❌ Failed to push prefs to %s: %s", dev.IP, string(out)))
+			continue
+		}
+
+		out, err = exec.Command(adbPath, "-s", devAddr, "shell",
+			"run-as com.example.exitkiosk cp /data/local/tmp/prefs.xml shared_prefs/PromptParkConfiguration.xml").CombinedOutput()
+		if err != nil {
+			a.emitEvent("exit-kiosk-progress", progress, fmt.Sprintf("⚠️ run-as cp failed on %s: %s", dev.IP, string(out)))
+			continue
+		}
+
+		exec.Command(adbPath, "-s", devAddr, "shell", "run-as com.example.exitkiosk chmod 660 shared_prefs/PromptParkConfiguration.xml").Run()
+		exec.Command(adbPath, "-s", devAddr, "shell", "rm /data/local/tmp/prefs.xml").Run()
+
+		a.emitEvent("exit-kiosk-progress", progress+5, fmt.Sprintf("✅ Config pushed to %s", dev.DeviceName))
+	}
+
+	a.emitEvent("exit-kiosk-progress", 100, "✅ Done saving to all devices.")
 }

@@ -18,6 +18,10 @@ export function DeployToServer(arg1:string,arg2:string,arg3:string,arg4:string,a
 
 export function Greet(arg1:string):Promise<string>;
 
+export function ReadEntranceKioskConfig(arg1:string):Promise<Record<string, string>>;
+
+export function ReadExitKioskConfig(arg1:string):Promise<Record<string, string>>;
+
 export function ReadRemoteEnv(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
 export function RedeployProxy(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
@@ -27,3 +31,7 @@ export function SaveEnvConfig(arg1:string):Promise<string>;
 export function SaveRemoteEnv(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function SendMockCameraEvent(arg1:string,arg2:string):Promise<string>;
+
+export function UpdateEntranceKioskConfig(arg1:Array<main.EntranceConfig>):Promise<void>;
+
+export function UpdateExitKioskConfig(arg1:Array<main.ExitConfig>):Promise<void>;

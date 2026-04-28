@@ -34,6 +34,14 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function ReadEntranceKioskConfig(arg1) {
+  return window['go']['main']['App']['ReadEntranceKioskConfig'](arg1);
+}
+
+export function ReadExitKioskConfig(arg1) {
+  return window['go']['main']['App']['ReadExitKioskConfig'](arg1);
+}
+
 export function ReadRemoteEnv(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ReadRemoteEnv'](arg1, arg2, arg3, arg4);
 }
@@ -52,4 +60,12 @@ export function SaveRemoteEnv(arg1, arg2, arg3, arg4, arg5) {
 
 export function SendMockCameraEvent(arg1, arg2) {
   return window['go']['main']['App']['SendMockCameraEvent'](arg1, arg2);
+}
+
+export function UpdateEntranceKioskConfig(arg1) {
+  return window['go']['main']['App']['UpdateEntranceKioskConfig'](arg1);
+}
+
+export function UpdateExitKioskConfig(arg1) {
+  return window['go']['main']['App']['UpdateExitKioskConfig'](arg1);
 }

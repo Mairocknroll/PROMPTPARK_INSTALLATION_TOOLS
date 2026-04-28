@@ -1,5 +1,95 @@
 export namespace main {
 	
+	export class EntranceConfig {
+	    ip: string;
+	    deviceName: string;
+	    gateNo: string;
+	    plcIp: string;
+	    parkingCode: string;
+	    paymentTicket: string;
+	    serverUrl: string;
+	    localServerUrl: string;
+	    vehicleMode: string;
+	    isSpecialEntrance: boolean;
+	    paymentApiVersion: string;
+	    apiMode: string;
+	    screenTimeoutSec: number;
+	    zoningMode: string;
+	    zoningCode: string;
+	    zoningGateNo: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new EntranceConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ip = source["ip"];
+	        this.deviceName = source["deviceName"];
+	        this.gateNo = source["gateNo"];
+	        this.plcIp = source["plcIp"];
+	        this.parkingCode = source["parkingCode"];
+	        this.paymentTicket = source["paymentTicket"];
+	        this.serverUrl = source["serverUrl"];
+	        this.localServerUrl = source["localServerUrl"];
+	        this.vehicleMode = source["vehicleMode"];
+	        this.isSpecialEntrance = source["isSpecialEntrance"];
+	        this.paymentApiVersion = source["paymentApiVersion"];
+	        this.apiMode = source["apiMode"];
+	        this.screenTimeoutSec = source["screenTimeoutSec"];
+	        this.zoningMode = source["zoningMode"];
+	        this.zoningCode = source["zoningCode"];
+	        this.zoningGateNo = source["zoningGateNo"];
+	    }
+	}
+	export class ExitConfig {
+	    ip: string;
+	    deviceName: string;
+	    gateNo: string;
+	    plcIp: string;
+	    parkingCode: string;
+	    projectCode: string;
+	    paymentTicket: string;
+	    serverUrl: string;
+	    localServerUrl: string;
+	    vehicleMode: string;
+	    apiMode: string;
+	    zoningMode: string;
+	    zoningCode: string;
+	    zoningGateNo: string;
+	    nextZoningCode: string;
+	    nextZoningGateNo: string;
+	    isCash: boolean;
+	    isQR: boolean;
+	    ticketMode: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExitConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ip = source["ip"];
+	        this.deviceName = source["deviceName"];
+	        this.gateNo = source["gateNo"];
+	        this.plcIp = source["plcIp"];
+	        this.parkingCode = source["parkingCode"];
+	        this.projectCode = source["projectCode"];
+	        this.paymentTicket = source["paymentTicket"];
+	        this.serverUrl = source["serverUrl"];
+	        this.localServerUrl = source["localServerUrl"];
+	        this.vehicleMode = source["vehicleMode"];
+	        this.apiMode = source["apiMode"];
+	        this.zoningMode = source["zoningMode"];
+	        this.zoningCode = source["zoningCode"];
+	        this.zoningGateNo = source["zoningGateNo"];
+	        this.nextZoningCode = source["nextZoningCode"];
+	        this.nextZoningGateNo = source["nextZoningGateNo"];
+	        this.isCash = source["isCash"];
+	        this.isQR = source["isQR"];
+	        this.ticketMode = source["ticketMode"];
+	    }
+	}
 	export class ExitKioskDevice {
 	    ip: string;
 	    deviceName: string;
