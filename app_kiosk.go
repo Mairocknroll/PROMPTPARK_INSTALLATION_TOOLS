@@ -180,8 +180,87 @@ func (a *App) DeleteSitePreset(id string) error {
 	return os.WriteFile("presets.json", data, 0644)
 }
 
+// GenericDeployConfig holds data for a simple APK installation
+type GenericDeployConfig struct {
+	APKPath string   `json:"apkPath"`
+	IPs     []string `json:"ips"`
+}
+
+// DeployGenericAPK handles simple APK installation and launch
+func (a *App) DeployGenericAPK(config GenericDeployConfig) {
+	adbPath, err := findADB()
+	if err != nil {
+		a.emitEvent("generic-deploy-progress", 0, "❌ ADB not found")
+		return
+	}
+
+	total := len(config.IPs)
+	for i, ip := range config.IPs {
+		progress := int((float64(i) / float64(total)) * 100)
+		devAddr := ip
+		if !strings.Contains(ip, ":") {
+			devAddr = ip + ":5555" // Default ADB port
+		}
+
+		a.emitEvent("generic-deploy-progress", progress, fmt.Sprintf("📡 Connecting to %s...", devAddr))
+		exec.Command(adbPath, "connect", devAddr).Run()
+
+		// Verify connection
+		out, _ := exec.Command(adbPath, "devices").CombinedOutput()
+		if !strings.Contains(string(out), devAddr) {
+			a.emitEvent("generic-deploy-progress", progress, fmt.Sprintf("❌ Failed to connect to %s", devAddr))
+			continue
+		}
+
+		// Step 2: Install APK
+		a.emitEvent("generic-deploy-progress", progress + 20, fmt.Sprintf("📦 Installing APK on %s...", devAddr))
+		out, err = exec.Command(adbPath, "-s", devAddr, "install", "-r", "-t", "-g", config.APKPath).CombinedOutput()
+		installOutput := strings.TrimSpace(string(out))
+		
+		if !strings.Contains(installOutput, "Success") {
+			a.emitEvent("generic-deploy-progress", progress, fmt.Sprintf("❌ Install failed: %s", installOutput))
+			continue
+		}
+		a.emitEvent("generic-deploy-progress", progress + 50, "✅ Installed successfully")
+
+		// Step 3: Try to find package and launch
+		pkgName := "com.example.app" // fallback
+		sdkRoot := os.Getenv("ANDROID_HOME")
+		if sdkRoot == "" { sdkRoot = os.Getenv("ANDROID_SDK_ROOT") }
+		if sdkRoot == "" { sdkRoot = `C:\Users\` + os.Getenv("USERNAME") + `\AppData\Local\Android\Sdk` }
+		btDir := filepath.Join(sdkRoot, "build-tools")
+		
+		if entries, err := os.ReadDir(btDir); err == nil {
+			for i := len(entries) - 1; i >= 0; i-- {
+				candidate := filepath.Join(btDir, entries[i].Name(), "aapt2.exe")
+				if _, err := os.Stat(candidate); err == nil {
+					aaptOut, _ := exec.Command(candidate, "dump", "badging", config.APKPath).CombinedOutput()
+					for _, line := range strings.Split(string(aaptOut), "\n") {
+						if strings.HasPrefix(line, "package:") {
+							parts := strings.Split(line, "'")
+							if len(parts) >= 2 { pkgName = parts[1] }
+							break
+						}
+					}
+					break
+				}
+			}
+		}
+
+		a.emitEvent("generic-deploy-progress", progress + 70, fmt.Sprintf("🚀 Launching %s...", pkgName))
+		exec.Command(adbPath, "-s", devAddr, "shell", "monkey -p "+pkgName+" -c android.intent.category.LAUNCHER 1").Run()
+		
+		// Optional: Auto-allow common dialogs for 15s
+		autoAllowPermissionDialogs(adbPath, devAddr, 15, func(msg string) {
+			a.emitEvent("generic-deploy-progress", progress, msg)
+		})
+	}
+
+	a.emitEvent("generic-deploy-progress", 100, "✅ All tasks completed.")
+}
 
 // ParkingNameResponse handles the API response for fetching parking names
+
 type ParkingNameResponse struct {
 	Status  bool   `json:"status"`
 	Message string `json:"message"`

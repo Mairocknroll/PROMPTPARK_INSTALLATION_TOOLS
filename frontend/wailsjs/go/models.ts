@@ -193,6 +193,20 @@ export namespace main {
 		}
 	}
 	
+	export class GenericDeployConfig {
+	    apkPath: string;
+	    ips: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new GenericDeployConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.apkPath = source["apkPath"];
+	        this.ips = source["ips"];
+	    }
+	}
 	export class HikCamera {
 	    ip: string;
 	    username: string;

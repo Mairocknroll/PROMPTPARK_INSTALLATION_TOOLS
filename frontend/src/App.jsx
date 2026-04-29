@@ -5,6 +5,7 @@ import HikConfig from './components/HikConfig';
 import EntranceKioskDeploy from './components/EntranceKioskDeploy';
 import ExitKioskDeploy from './components/ExitKioskDeploy';
 import IntegrationTools from './components/IntegrationTools';
+import GeneralAppDeploy from './components/GeneralAppDeploy';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -45,6 +46,7 @@ function App() {
                         {activeMenu === 'kiosk_deploy' && <EntranceKioskDeploy />}
                         {activeMenu === 'exit_kiosk_deploy' && <ExitKioskDeploy />}
                         {activeMenu === 'integration_tools' && <IntegrationTools />}
+                        {activeMenu === 'general_deploy' && <GeneralAppDeploy />}
                     </div>
                 </div>
             </div>

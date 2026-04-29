@@ -34,6 +34,10 @@ export function DeployExitKioskAPK(arg1) {
   return window['go']['main']['App']['DeployExitKioskAPK'](arg1);
 }
 
+export function DeployGenericAPK(arg1) {
+  return window['go']['main']['App']['DeployGenericAPK'](arg1);
+}
+
 export function DeployKioskAPK(arg1) {
   return window['go']['main']['App']['DeployKioskAPK'](arg1);
 }

@@ -39,6 +39,12 @@ function Sidebar({ activeMenu, setActiveMenu }) {
                 >
                     🛠️ Integration Tools
                 </button>
+                <button
+                    onClick={() => setActiveMenu('general_deploy')}
+                    className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-all ${activeMenu === 'general_deploy' ? 'bg-orange-600/10 text-orange-400 border border-orange-500/20 font-bold' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
+                >
+                    🚀 General App Installer
+                </button>
             </div>
             <div className="text-[10px] text-gray-600 text-center pb-2 pt-4 border-t border-gray-800">v1.0.0</div>
         </div>

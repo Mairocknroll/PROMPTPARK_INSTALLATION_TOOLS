@@ -18,6 +18,8 @@ export function DeleteSitePreset(arg1:string):Promise<void>;
 
 export function DeployExitKioskAPK(arg1:main.ExitKioskDeployConfig):Promise<void>;
 
+export function DeployGenericAPK(arg1:main.GenericDeployConfig):Promise<void>;
+
 export function DeployKioskAPK(arg1:main.KioskDeployConfig):Promise<void>;
 
 export function DeployToServer(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
