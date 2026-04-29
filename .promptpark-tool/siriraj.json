@@ -1,0 +1,253 @@
+{
+  "name": "siriraj",
+  "updatedAt": "2026-04-29T10:57:06+07:00",
+  "data": {
+    "id": "siriraj-1777435026922",
+    "name": "siriraj",
+    "system": {
+      "SERVER_URL": "https://api-pms.promptpark.co",
+      "PARKING_CODE": "si25060030",
+      "ADDR": "0.0.0.0:8000",
+      "CAMERA_USER": "admin",
+      "CAMERA_PASS": "Jp@rk1ng",
+      "MODBUS_PORT": "504",
+      "MODBUS_TIMEOUT_MS": "2000",
+      "MODBUS_PULSE_MS": "500",
+      "MODBUS_SLAVE_ID": "1"
+    },
+    "lanes": [
+      {
+        "id": "ENT-01-1777435026921",
+        "type": "ENT",
+        "number": "01",
+        "gateIp": "10.10.22.117",
+        "lprIp": "10.10.22.137",
+        "licIp": "10.10.22.147",
+        "driIp": "10.10.22.157",
+        "hasLed": true,
+        "ledIp": ""
+      },
+      {
+        "id": "EXT-01-1777435026922",
+        "type": "EXT",
+        "number": "01",
+        "gateIp": "10.10.22.118",
+        "lprIp": "10.10.22.138",
+        "licIp": "10.10.22.148",
+        "driIp": "10.10.22.158",
+        "hasLed": true,
+        "ledIp": ""
+      },
+      {
+        "id": "ENT-02-1777435026922",
+        "type": "ENT",
+        "number": "02",
+        "gateIp": "10.10.29.11",
+        "lprIp": "10.10.29.30",
+        "licIp": "10.10.29.40",
+        "driIp": "10.10.29.50",
+        "hasLed": false,
+        "ledIp": ""
+      },
+      {
+        "id": "EXT-02-1777435026922",
+        "type": "EXT",
+        "number": "02",
+        "gateIp": "10.10.29.10",
+        "lprIp": "10.10.29.31",
+        "licIp": "10.10.29.41",
+        "driIp": "10.10.29.51",
+        "hasLed": false,
+        "ledIp": ""
+      },
+      {
+        "id": "ENT-03-1777435026922",
+        "type": "ENT",
+        "number": "03",
+        "gateIp": "10.10.22.15",
+        "lprIp": "10.10.22.35",
+        "licIp": "10.10.22.45",
+        "driIp": "10.10.22.55",
+        "hasLed": false,
+        "ledIp": ""
+      },
+      {
+        "id": "EXT-03-1777435026922",
+        "type": "EXT",
+        "number": "03",
+        "gateIp": "10.10.22.16",
+        "lprIp": "10.10.22.36",
+        "licIp": "10.10.22.46",
+        "driIp": "10.10.22.56",
+        "hasLed": false,
+        "ledIp": ""
+      },
+      {
+        "id": "ENT-04-1777435026922",
+        "type": "ENT",
+        "number": "04",
+        "gateIp": "",
+        "lprIp": "10.10.22.33",
+        "licIp": "10.10.22.43",
+        "driIp": "10.10.22.53",
+        "hasLed": true,
+        "ledIp": "10.10.22.93"
+      },
+      {
+        "id": "EXT-04-1777435026922",
+        "type": "EXT",
+        "number": "04",
+        "gateIp": "",
+        "lprIp": "10.10.22.34",
+        "licIp": "10.10.22.44",
+        "driIp": "10.10.22.54",
+        "hasLed": true,
+        "ledIp": ""
+      },
+      {
+        "id": "ENT-06-1777435026922",
+        "type": "ENT",
+        "number": "06",
+        "gateIp": "",
+        "lprIp": "10.10.28.30",
+        "licIp": "10.10.28.40",
+        "driIp": "10.10.28.50",
+        "hasLed": false,
+        "ledIp": ""
+      },
+      {
+        "id": "EXT-06-1777435026922",
+        "type": "EXT",
+        "number": "06",
+        "gateIp": "",
+        "lprIp": "10.10.28.31",
+        "licIp": "10.10.28.41",
+        "driIp": "10.10.28.51",
+        "hasLed": false,
+        "ledIp": ""
+      },
+      {
+        "id": "EXT-05-1777435026922",
+        "type": "EXT",
+        "number": "05",
+        "gateIp": "10.10.27.11",
+        "lprIp": "10.10.27.31",
+        "licIp": "10.10.27.41",
+        "driIp": "10.10.27.51",
+        "hasLed": true,
+        "ledIp": "10.10.27.91"
+      },
+      {
+        "id": "ENT-05-1777435026922",
+        "type": "ENT",
+        "number": "05",
+        "gateIp": "",
+        "lprIp": "10.10.27.30",
+        "licIp": "10.10.27.40",
+        "driIp": "10.10.27.50",
+        "hasLed": false,
+        "ledIp": ""
+      },
+      {
+        "id": "ENT-07-1777435026922",
+        "type": "ENT",
+        "number": "07",
+        "gateIp": "10.10.22.201",
+        "lprIp": "10.10.22.203",
+        "licIp": "10.10.22.204",
+        "driIp": "10.10.22.205",
+        "hasLed": true,
+        "ledIp": "10.10.22.209"
+      },
+      {
+        "id": "ENT-08-1777435026922",
+        "type": "ENT",
+        "number": "08",
+        "gateIp": "10.10.22.10",
+        "lprIp": "10.10.22.30",
+        "licIp": "10.10.22.40",
+        "driIp": "10.10.22.50",
+        "hasLed": true,
+        "ledIp": "10.10.22.90"
+      },
+      {
+        "id": "EXT-09-1777435026922",
+        "type": "EXT",
+        "number": "09",
+        "gateIp": "10.10.22.12",
+        "lprIp": "10.10.22.32",
+        "licIp": "10.10.22.42",
+        "driIp": "10.10.22.52",
+        "hasLed": true,
+        "ledIp": "10.10.22.92"
+      },
+      {
+        "id": "EXT-10-1777435026922",
+        "type": "EXT",
+        "number": "10",
+        "gateIp": "10.10.22.11",
+        "lprIp": "10.10.22.31",
+        "licIp": "10.10.22.41",
+        "driIp": "10.10.22.51",
+        "hasLed": true,
+        "ledIp": "10.10.22.91"
+      },
+      {
+        "id": "ENT-11-1777435026922",
+        "type": "ENT",
+        "number": "11",
+        "gateIp": "10.10.22.119",
+        "lprIp": "10.10.22.139",
+        "licIp": "10.10.22.149",
+        "driIp": "10.10.22.159",
+        "hasLed": true,
+        "ledIp": "10.10.22.199"
+      },
+      {
+        "id": "EXT-11-1777435026922",
+        "type": "EXT",
+        "number": "11",
+        "gateIp": "10.10.22.171",
+        "lprIp": "10.10.22.173",
+        "licIp": "10.10.22.174",
+        "driIp": "10.10.22.175",
+        "hasLed": true,
+        "ledIp": "10.10.22.179"
+      },
+      {
+        "id": "ENT-12-1777435026922",
+        "type": "ENT",
+        "number": "12",
+        "gateIp": "10.10.25.10",
+        "lprIp": "10.10.25.30",
+        "licIp": "10.10.25.40",
+        "driIp": "10.10.25.50",
+        "hasLed": true,
+        "ledIp": "10.10.25.90"
+      },
+      {
+        "id": "EXT-12-1777435026922",
+        "type": "EXT",
+        "number": "12",
+        "gateIp": "10.10.25.11",
+        "lprIp": "10.10.25.31",
+        "licIp": "10.10.25.41",
+        "driIp": "10.10.25.51",
+        "hasLed": true,
+        "ledIp": "10.10.25.91"
+      }
+    ],
+    "serverConfig": {
+      "ip": "10.10.22.2",
+      "username": "jpark",
+      "password": "",
+      "targetPath": "/home/jpark/go_local_proxy_api"
+    },
+    "status": {
+      "lastDeployAt": "",
+      "lastDeployStatus": "loaded",
+      "lastHealthcheckAt": "",
+      "lastHealthcheckStatus": ""
+    }
+  }
+}
