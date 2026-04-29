@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowseAPKFile, DeployKioskAPK, ReadEntranceKioskConfig, UpdateEntranceKioskConfig, ValidateEntranceKioskConfig, CheckADBAvailability, DiagnoseADBDevice } from '../../wailsjs/go/main/App';
+import { BrowseAPKFile, DeployKioskAPK, ReadEntranceKioskConfig, UpdateEntranceKioskConfig, ValidateEntranceKioskConfig, CheckADBAvailability, DiagnoseADBDevice, SaveSitePreset, GetSitePresets, DeleteSitePreset } from '../../wailsjs/go/main/App';
 import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime';
 
 function EntranceKioskDeploy() {
@@ -25,6 +25,11 @@ function EntranceKioskDeploy() {
         zoningGateNo: '1'
     });
 
+    // --- Preset State ---
+    const [presets, setPresets] = useState([]);
+    const [selectedPresetId, setSelectedPresetId] = useState('');
+    const [siteName, setSiteName] = useState('');
+
     // --- Read/Edit Tab State ---
     const [readIps, setReadIps] = useState([]);
     const [newReadIp, setNewReadIp] = useState('');
@@ -41,10 +46,73 @@ function EntranceKioskDeploy() {
             setKioskProgress(data.progress);
             setKioskStatus(prev => prev + '\n' + data.message);
         });
+        loadPresets();
         return () => {
             EventsOff("kiosk-progress");
         };
     }, []);
+
+    const loadPresets = async () => {
+        const list = await GetSitePresets();
+        setPresets(list || []);
+    };
+
+    const handleSavePreset = async () => {
+        if (!siteName) {
+            alert('Please enter a Site Name to save.');
+            return;
+        }
+        const preset = {
+            id: selectedPresetId,
+            siteName: siteName,
+            type: 'entrance',
+            kioskConfig: {
+                apkPath: kioskApkPath,
+                devices: kioskDevices,
+                ...kioskGlobalConfig,
+                screenTimeoutSec: parseInt(kioskGlobalConfig.screenTimeoutSec) || 10
+            }
+        };
+        await SaveSitePreset(preset);
+        await loadPresets();
+        alert('Site Preset saved successfully!');
+    };
+
+    const handleSelectPreset = (id) => {
+        setSelectedPresetId(id);
+        const preset = presets.find(p => p.id === id);
+        if (preset) {
+            setSiteName(preset.siteName);
+            setKioskApkPath(preset.kioskConfig.apkPath);
+            setKioskDevices(preset.kioskConfig.devices || []);
+            setKioskGlobalConfig({
+                parkingCode: preset.kioskConfig.parkingCode,
+                paymentTicket: preset.kioskConfig.paymentTicket,
+                serverUrl: preset.kioskConfig.serverUrl,
+                localServerUrl: preset.kioskConfig.localServerUrl,
+                vehicleMode: preset.kioskConfig.vehicleMode,
+                isSpecialEntrance: preset.kioskConfig.isSpecialEntrance,
+                paymentApiVersion: preset.kioskConfig.paymentApiVersion,
+                apiMode: preset.kioskConfig.apiMode,
+                screenTimeoutSec: preset.kioskConfig.screenTimeoutSec,
+                zoningMode: preset.kioskConfig.zoningMode,
+                zoningCode: preset.kioskConfig.zoningCode,
+                zoningGateNo: preset.kioskConfig.zoningGateNo
+            });
+        } else {
+            setSiteName('');
+            setSelectedPresetId('');
+        }
+    };
+
+    const handleDeletePreset = async () => {
+        if (!selectedPresetId) return;
+        if (window.confirm('Are you sure you want to delete this preset?')) {
+            await DeleteSitePreset(selectedPresetId);
+            await loadPresets();
+            handleSelectPreset('');
+        }
+    };
 
     // --- Methods ---
     const handleBrowseAPK = async () => {
@@ -195,19 +263,52 @@ function EntranceKioskDeploy() {
             </div>
 
             {/* Tabs */}
-            <div className="flex border-b border-gray-800 mb-6 gap-6">
-                <button
-                    onClick={() => setActiveTab('install')}
-                    className={`pb-2 text-sm font-bold transition-all ${activeTab === 'install' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}
-                >
-                    New Install
-                </button>
-                <button
-                    onClick={() => setActiveTab('read')}
-                    className={`pb-2 text-sm font-bold transition-all ${activeTab === 'read' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}
-                >
-                    Read & Edit Config
-                </button>
+            <div className="flex border-b border-gray-800 mb-6 gap-6 items-center justify-between">
+                <div className="flex gap-6">
+                    <button
+                        onClick={() => setActiveTab('install')}
+                        className={`pb-2 text-sm font-bold transition-all ${activeTab === 'install' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        New Install
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('read')}
+                        className={`pb-2 text-sm font-bold transition-all ${activeTab === 'read' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        Read & Edit Config
+                    </button>
+                </div>
+
+                {activeTab === 'install' && (
+                    <div className="flex items-center gap-2 mb-2 pb-1">
+                        <select 
+                            className="bg-[#0d1117] border border-gray-800 rounded px-3 py-1 text-xs text-blue-400 font-bold"
+                            value={selectedPresetId}
+                            onChange={(e) => handleSelectPreset(e.target.value)}
+                        >
+                            <option value="">-- Load Site Preset --</option>
+                            {presets.map(p => <option key={p.id} value={p.id}>{p.siteName}</option>)}
+                        </select>
+                        <input 
+                            className="bg-[#0d1117] border border-gray-800 rounded px-2 py-1 text-xs w-32"
+                            placeholder="Site Name..."
+                            value={siteName}
+                            onChange={(e) => setSiteName(e.target.value)}
+                        />
+                        <button onClick={handleSavePreset} className="bg-blue-600 hover:bg-blue-500 p-1 rounded text-white" title="Save Preset">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                            </svg>
+                        </button>
+                        {selectedPresetId && (
+                            <button onClick={handleDeletePreset} className="bg-red-900/50 hover:bg-red-800 p-1 rounded text-red-400" title="Delete Preset">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

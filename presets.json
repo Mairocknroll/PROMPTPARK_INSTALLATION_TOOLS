@@ -1,0 +1,30 @@
+[
+  {
+    "id": "1777444875",
+    "siteName": "si25060030",
+    "kioskConfig": {
+      "apkPath": "D:\\Implement\\EntranceKiosk\\app\\build\\outputs\\apk\\debug\\app-debug.apk",
+      "devices": [
+        {
+          "ip": "172.20.9.102",
+          "deviceName": "asus-kiosk-lab-01",
+          "gateNo": "1",
+          "plcIp": "172.20.9.110"
+        }
+      ],
+      "parkingCode": "si25060030",
+      "paymentTicket": "https://payment.jparkdev.co",
+      "serverUrl": "https://api-pms.jparkdev.co",
+      "localServerUrl": "http://172.20.9.2:8000",
+      "vehicleMode": "Car",
+      "isSpecialEntrance": false,
+      "paymentApiVersion": "API Promptpark",
+      "apiMode": "V2",
+      "screenTimeoutSec": 60,
+      "zoningMode": "NORMAL",
+      "zoningCode": "",
+      "zoningGateNo": "1"
+    },
+    "type": "entrance"
+  }
+]

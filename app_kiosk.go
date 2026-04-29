@@ -112,6 +112,75 @@ type ExitConfig struct {
 	TicketMode       string `json:"ticketMode"`
 }
 
+type SitePreset struct {
+	ID          string            `json:"id"`
+	SiteName    string            `json:"siteName"`
+	KioskConfig KioskDeployConfig `json:"kioskConfig"`
+	Type        string            `json:"type"` // "entrance" or "exit"
+}
+
+// SaveSitePreset saves the current configuration to presets.json
+func (a *App) SaveSitePreset(preset SitePreset) error {
+	presets, _ := a.GetSitePresets()
+	
+	if preset.ID == "" {
+		preset.ID = fmt.Sprintf("%d", time.Now().Unix())
+	}
+
+	found := false
+	for i, p := range presets {
+		if p.ID == preset.ID {
+			presets[i] = preset
+			found = true
+			break
+		}
+	}
+	if !found {
+		presets = append(presets, preset)
+	}
+
+	data, err := json.MarshalIndent(presets, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile("presets.json", data, 0644)
+}
+
+// GetSitePresets reads all saved presets
+func (a *App) GetSitePresets() ([]SitePreset, error) {
+	if _, err := os.Stat("presets.json"); os.IsNotExist(err) {
+		return []SitePreset{}, nil
+	}
+
+	data, err := os.ReadFile("presets.json")
+	if err != nil {
+		return nil, err
+	}
+
+	var presets []SitePreset
+	err = json.Unmarshal(data, &presets)
+	return presets, err
+}
+
+// DeleteSitePreset removes a preset by ID
+func (a *App) DeleteSitePreset(id string) error {
+	presets, _ := a.GetSitePresets()
+	newPresets := []SitePreset{}
+	for _, p := range presets {
+		if p.ID != id {
+			newPresets = append(newPresets, p)
+		}
+	}
+	
+	data, err := json.MarshalIndent(newPresets, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile("presets.json", data, 0644)
+}
+
+
 // ParkingNameResponse handles the API response for fetching parking names
 type ParkingNameResponse struct {
 	Status  bool   `json:"status"`

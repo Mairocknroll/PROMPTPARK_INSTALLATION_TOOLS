@@ -26,6 +26,10 @@ export function DeleteInstallationProfile(arg1) {
   return window['go']['main']['App']['DeleteInstallationProfile'](arg1);
 }
 
+export function DeleteSitePreset(arg1) {
+  return window['go']['main']['App']['DeleteSitePreset'](arg1);
+}
+
 export function DeployExitKioskAPK(arg1) {
   return window['go']['main']['App']['DeployExitKioskAPK'](arg1);
 }
@@ -40,6 +44,10 @@ export function DeployToServer(arg1, arg2, arg3, arg4, arg5) {
 
 export function DiagnoseADBDevice(arg1, arg2) {
   return window['go']['main']['App']['DiagnoseADBDevice'](arg1, arg2);
+}
+
+export function GetSitePresets() {
+  return window['go']['main']['App']['GetSitePresets']();
 }
 
 export function Greet(arg1) {
@@ -92,6 +100,10 @@ export function SaveInstallationProfile(arg1) {
 
 export function SaveRemoteEnv(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['SaveRemoteEnv'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function SaveSitePreset(arg1) {
+  return window['go']['main']['App']['SaveSitePreset'](arg1);
 }
 
 export function SendMockCameraEvent(arg1, arg2) {
