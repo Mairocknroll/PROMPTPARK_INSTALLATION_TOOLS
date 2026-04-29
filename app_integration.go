@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"embed"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -15,6 +16,43 @@ import (
 
 	"github.com/google/uuid"
 )
+
+//go:embed mock_images/anpr.xml mock_images/detectionPicture.jpg mock_images/licensePlatePicture.jpg
+var defaultMockImages embed.FS
+
+func mockImagesDir() string {
+	return filepath.Join(dataDir(), "mock_images")
+}
+
+func ensureDefaultMockAsset(imgDir string, filename string) error {
+	targetPath := filepath.Join(imgDir, filename)
+	if _, err := os.Stat(targetPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to check mock asset %s: %v", targetPath, err)
+	}
+
+	data, err := defaultMockImages.ReadFile(filepath.ToSlash(filepath.Join("mock_images", filename)))
+	if err != nil {
+		return fmt.Errorf("failed to read embedded mock asset %s: %v", filename, err)
+	}
+	if err := os.WriteFile(targetPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write mock asset %s: %v", targetPath, err)
+	}
+	return nil
+}
+
+func ensureDefaultMockAssets(imgDir string) error {
+	if err := os.MkdirAll(imgDir, 0755); err != nil {
+		return fmt.Errorf("failed to create mock_images folder: %v", err)
+	}
+	for _, filename := range []string{"anpr.xml", "detectionPicture.jpg", "licensePlatePicture.jpg"} {
+		if err := ensureDefaultMockAsset(imgDir, filename); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func buildMockANPRPayload(templatePath string, licensePlate string) (string, error) {
 	templateBytes, err := os.ReadFile(templatePath)
@@ -55,24 +93,14 @@ func escapeXMLText(value string) string {
 }
 
 func (a *App) SendMockCameraEvent(url string, licensePlate string) (string, error) {
-	// Create mock_images folder if not exists
-	imgDir := "mock_images"
-	if err := os.MkdirAll(imgDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create mock_images folder: %v", err)
+	imgDir := mockImagesDir()
+	if err := ensureDefaultMockAssets(imgDir); err != nil {
+		return "", err
 	}
 
 	xmlTemplatePath := filepath.Join(imgDir, "anpr.xml")
 	detPicPath := filepath.Join(imgDir, "detectionPicture.jpg")
 	licPicPath := filepath.Join(imgDir, "licensePlatePicture.jpg")
-
-	// Create dummy image files if they don't exist
-	for _, path := range []string{detPicPath, licPicPath} {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
-			if err := os.WriteFile(path, []byte("dummy image content"), 0644); err != nil {
-				return "", fmt.Errorf("failed to create dummy image %s: %v", path, err)
-			}
-		}
-	}
 
 	xmlPayload, err := buildMockANPRPayload(xmlTemplatePath, licensePlate)
 	if err != nil {

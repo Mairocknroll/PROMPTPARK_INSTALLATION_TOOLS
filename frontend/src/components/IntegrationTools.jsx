@@ -120,7 +120,7 @@ function IntegrationTools() {
                             <div className="bg-[#090c10] border border-gray-800 rounded-lg p-3 mt-4 text-xs text-gray-400">
                                 <p className="mb-2"><strong className="text-gray-300">Note:</strong> This tool will:</p>
                                 <ul className="list-disc pl-4 space-y-1">
-                                    <li>Use <code>mock_images/anpr.xml</code> and update plate and UUID before sending.</li>
+                                    <li>Use <code>.promptpark-tool/mock_images/anpr.xml</code> and update plate and UUID before sending.</li>
                                     <li>Include mock <code>detectionPicture.jpg</code> and <code>licensePlatePicture.jpg</code>.</li>
                                     <li>Send as <code>multipart/form-data</code> to the selected endpoint.</li>
                                 </ul>
