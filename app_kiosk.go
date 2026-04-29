@@ -122,7 +122,7 @@ type SitePreset struct {
 // SaveSitePreset saves the current configuration to presets.json
 func (a *App) SaveSitePreset(preset SitePreset) error {
 	presets, _ := a.GetSitePresets()
-	
+
 	if preset.ID == "" {
 		preset.ID = fmt.Sprintf("%d", time.Now().Unix())
 	}
@@ -172,7 +172,7 @@ func (a *App) DeleteSitePreset(id string) error {
 			newPresets = append(newPresets, p)
 		}
 	}
-	
+
 	data, err := json.MarshalIndent(newPresets, "", "  ")
 	if err != nil {
 		return err
@@ -213,23 +213,27 @@ func (a *App) DeployGenericAPK(config GenericDeployConfig) {
 		}
 
 		// Step 2: Install APK
-		a.emitEvent("generic-deploy-progress", progress + 20, fmt.Sprintf("📦 Installing APK on %s...", devAddr))
+		a.emitEvent("generic-deploy-progress", progress+20, fmt.Sprintf("📦 Installing APK on %s...", devAddr))
 		out, err = exec.Command(adbPath, "-s", devAddr, "install", "-r", "-t", "-g", config.APKPath).CombinedOutput()
 		installOutput := strings.TrimSpace(string(out))
-		
+
 		if !strings.Contains(installOutput, "Success") {
 			a.emitEvent("generic-deploy-progress", progress, fmt.Sprintf("❌ Install failed: %s", installOutput))
 			continue
 		}
-		a.emitEvent("generic-deploy-progress", progress + 50, "✅ Installed successfully")
+		a.emitEvent("generic-deploy-progress", progress+50, "✅ Installed successfully")
 
 		// Step 3: Try to find package and launch
 		pkgName := "com.example.app" // fallback
 		sdkRoot := os.Getenv("ANDROID_HOME")
-		if sdkRoot == "" { sdkRoot = os.Getenv("ANDROID_SDK_ROOT") }
-		if sdkRoot == "" { sdkRoot = `C:\Users\` + os.Getenv("USERNAME") + `\AppData\Local\Android\Sdk` }
+		if sdkRoot == "" {
+			sdkRoot = os.Getenv("ANDROID_SDK_ROOT")
+		}
+		if sdkRoot == "" {
+			sdkRoot = `C:\Users\` + os.Getenv("USERNAME") + `\AppData\Local\Android\Sdk`
+		}
 		btDir := filepath.Join(sdkRoot, "build-tools")
-		
+
 		if entries, err := os.ReadDir(btDir); err == nil {
 			for i := len(entries) - 1; i >= 0; i-- {
 				candidate := filepath.Join(btDir, entries[i].Name(), "aapt2.exe")
@@ -238,7 +242,9 @@ func (a *App) DeployGenericAPK(config GenericDeployConfig) {
 					for _, line := range strings.Split(string(aaptOut), "\n") {
 						if strings.HasPrefix(line, "package:") {
 							parts := strings.Split(line, "'")
-							if len(parts) >= 2 { pkgName = parts[1] }
+							if len(parts) >= 2 {
+								pkgName = parts[1]
+							}
 							break
 						}
 					}
@@ -247,9 +253,9 @@ func (a *App) DeployGenericAPK(config GenericDeployConfig) {
 			}
 		}
 
-		a.emitEvent("generic-deploy-progress", progress + 70, fmt.Sprintf("🚀 Launching %s...", pkgName))
+		a.emitEvent("generic-deploy-progress", progress+70, fmt.Sprintf("🚀 Launching %s...", pkgName))
 		exec.Command(adbPath, "-s", devAddr, "shell", "monkey -p "+pkgName+" -c android.intent.category.LAUNCHER 1").Run()
-		
+
 		// Optional: Auto-allow common dialogs for 15s
 		autoAllowPermissionDialogs(adbPath, devAddr, 15, func(msg string) {
 			a.emitEvent("generic-deploy-progress", progress, msg)
@@ -497,6 +503,96 @@ func findADB() (string, error) {
 	return "", fmt.Errorf("adb not found. Please install Android Platform Tools and add to PATH")
 }
 
+func adbDeviceAddress(ip string) string {
+	ip = strings.TrimSpace(ip)
+	if strings.Contains(ip, ":") {
+		return ip
+	}
+	return ip + ":5555"
+}
+
+func adbDeviceHost(ip string) string {
+	ip = strings.TrimSpace(ip)
+	if host, _, ok := strings.Cut(ip, ":"); ok {
+		return host
+	}
+	return ip
+}
+
+func adbDeviceState(adbPath string, devAddr string) (string, string) {
+	out, _ := exec.Command(adbPath, "devices").CombinedOutput()
+	devicesOutput := strings.TrimSpace(string(out))
+	for _, line := range strings.Split(devicesOutput, "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) >= 2 && fields[0] == devAddr {
+			return fields[1], devicesOutput
+		}
+	}
+	return "", devicesOutput
+}
+
+func enableADBOverTCPFromUSB(adbPath string, targetIP string) error {
+	devicesOut, _ := exec.Command(adbPath, "devices").CombinedOutput()
+	devicesOutput := strings.TrimSpace(string(devicesOut))
+	scanned := []string{}
+
+	for _, line := range strings.Split(devicesOutput, "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 2 || fields[0] == "List" || fields[1] != "device" || strings.Contains(fields[0], ":") {
+			continue
+		}
+
+		serial := fields[0]
+		ipOut, _ := exec.Command(adbPath, "-s", serial, "shell", "ip -f inet addr show wlan0; ip -f inet addr show eth0; ip -f inet addr show").CombinedOutput()
+		ipOutput := strings.TrimSpace(string(ipOut))
+		scanned = append(scanned, fmt.Sprintf("%s=%s", serial, ipOutput))
+		if !strings.Contains(ipOutput, targetIP) {
+			continue
+		}
+
+		tcpipOut, err := exec.Command(adbPath, "-s", serial, "tcpip", "5555").CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("found USB device %s with IP %s, but adb tcpip 5555 failed: %s", serial, targetIP, strings.TrimSpace(string(tcpipOut)))
+		}
+		time.Sleep(2 * time.Second)
+		return nil
+	}
+
+	if devicesOutput == "" || devicesOutput == "List of devices attached" {
+		return fmt.Errorf("ADB TCP is not enabled on %s and no USB ADB device is connected. Connect the kiosk by USB once or enable Wireless debugging/TCP 5555, then retry", targetIP)
+	}
+	return fmt.Errorf("ADB TCP is not enabled on %s and no connected USB ADB device reports that IP. devices: %s; scanned: %s", targetIP, devicesOutput, strings.Join(scanned, " | "))
+}
+
+func ensureADBDevice(adbPath string, ip string) (string, error) {
+	devAddr := adbDeviceAddress(ip)
+	connectOut, connectErr := exec.Command(adbPath, "connect", devAddr).CombinedOutput()
+	connectOutput := strings.TrimSpace(string(connectOut))
+
+	state, devicesOutput := adbDeviceState(adbPath, devAddr)
+	if state == "device" {
+		return devAddr, nil
+	}
+	if state != "" {
+		return "", fmt.Errorf("ADB device %s is %s. connect output: %s", devAddr, state, connectOutput)
+	}
+	if connectErr != nil {
+		if enableErr := enableADBOverTCPFromUSB(adbPath, adbDeviceHost(ip)); enableErr != nil {
+			return "", fmt.Errorf("ADB connect to %s failed: %s. %s", devAddr, connectOutput, enableErr)
+		}
+		connectOut, connectErr = exec.Command(adbPath, "connect", devAddr).CombinedOutput()
+		connectOutput = strings.TrimSpace(string(connectOut))
+		if connectErr != nil {
+			return "", fmt.Errorf("ADB connect to %s failed after enabling TCP: %s", devAddr, connectOutput)
+		}
+		state, devicesOutput = adbDeviceState(adbPath, devAddr)
+		if state == "device" {
+			return devAddr, nil
+		}
+	}
+	return "", fmt.Errorf("ADB device %s not listed after connect. connect output: %s; devices: %s", devAddr, connectOutput, devicesOutput)
+}
+
 // BrowseAPKFile opens a file dialog to select an APK file
 func (a *App) BrowseAPKFile() string {
 	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
@@ -528,7 +624,7 @@ func (a *App) DeployKioskAPK(config KioskDeployConfig) {
 	total := len(config.Devices)
 	for i, dev := range config.Devices {
 		progress := int((float64(i)/float64(total))*90) + 5
-		devAddr := dev.IP + ":5555"
+		devAddr := adbDeviceAddress(dev.IP)
 
 		// Step 1: ADB connect
 		a.emitEvent("kiosk-progress", progress, fmt.Sprintf("📡 Connecting to %s (%s)...", dev.DeviceName, dev.IP))
@@ -543,8 +639,12 @@ func (a *App) DeployKioskAPK(config KioskDeployConfig) {
 		pkgName := "com.example.entrancekiosk" // default
 		if config.APKPath != "" {
 			sdkRoot := os.Getenv("ANDROID_HOME")
-			if sdkRoot == "" { sdkRoot = os.Getenv("ANDROID_SDK_ROOT") }
-			if sdkRoot == "" { sdkRoot = `C:\Users\` + os.Getenv("USERNAME") + `\AppData\Local\Android\Sdk` }
+			if sdkRoot == "" {
+				sdkRoot = os.Getenv("ANDROID_SDK_ROOT")
+			}
+			if sdkRoot == "" {
+				sdkRoot = `C:\Users\` + os.Getenv("USERNAME") + `\AppData\Local\Android\Sdk`
+			}
 			btDir := filepath.Join(sdkRoot, "build-tools")
 			if entries, err := os.ReadDir(btDir); err == nil {
 				for i := len(entries) - 1; i >= 0; i-- {
@@ -554,7 +654,9 @@ func (a *App) DeployKioskAPK(config KioskDeployConfig) {
 						for _, line := range strings.Split(string(aaptOut), "\n") {
 							if strings.HasPrefix(line, "package:") {
 								parts := strings.Split(line, "'")
-								if len(parts) >= 2 { pkgName = parts[1] }
+								if len(parts) >= 2 {
+									pkgName = parts[1]
+								}
 								break
 							}
 						}
@@ -567,24 +669,24 @@ func (a *App) DeployKioskAPK(config KioskDeployConfig) {
 		// Step 2: Install APK (Aggressive)
 		if config.APKPath != "" {
 			a.emitEvent("kiosk-progress", progress, fmt.Sprintf("📦 Preparing to install %s...", pkgName))
-			
+
 			// Uninstall old versions to be sure
 			exec.Command(adbPath, "-s", devAddr, "uninstall", pkgName).Run()
 			exec.Command(adbPath, "-s", devAddr, "uninstall", "mrta.kiosk.entrance_kiosk").Run()
-			
+
 			a.emitEvent("kiosk-progress", progress, "📦 Installing APK (Fresh)...")
 			// -r: replace, -t: allow test, -g: grant all permissions
 			out, err = exec.Command(adbPath, "-s", devAddr, "install", "-r", "-t", "-g", config.APKPath).CombinedOutput()
 			installOutput := strings.TrimSpace(string(out))
 			a.emitEvent("kiosk-progress", progress, fmt.Sprintf("📋 Install output: %s", installOutput))
-			
+
 			if !strings.Contains(installOutput, "Success") {
 				a.emitEvent("kiosk-progress", progress, fmt.Sprintf("❌ Install failed: %s", installOutput))
 				continue
 			}
 			a.emitEvent("kiosk-progress", progress, "✅ APK installed successfully")
 		}
-		
+
 		// Verify and wait
 		time.Sleep(3 * time.Second)
 		pmCheck, _ := exec.Command(adbPath, "-s", devAddr, "shell", "pm path "+pkgName).CombinedOutput()
@@ -596,7 +698,7 @@ func (a *App) DeployKioskAPK(config KioskDeployConfig) {
 		}
 
 		a.emitEvent("kiosk-progress", progress, fmt.Sprintf("✅ Using package: %s", pkgName))
-		
+
 		// Auto-grant permissions
 		a.emitEvent("kiosk-progress", progress, "🔑 Granting File & Media permissions...")
 		exec.Command(adbPath, "-s", devAddr, "shell", "pm grant "+pkgName+" android.permission.READ_EXTERNAL_STORAGE").Run()
@@ -727,19 +829,13 @@ func (a *App) ReadEntranceKioskConfig(ip string) (map[string]string, error) {
 		return nil, fmt.Errorf("ADB not found: %v", err)
 	}
 
-	devAddr := ip + ":5555"
-
-	// Connect
-	exec.Command(adbPath, "connect", devAddr).Run()
-
-	// Verify connection
-	out, _ := exec.Command(adbPath, "devices").CombinedOutput()
-	if !strings.Contains(string(out), devAddr) {
-		return nil, fmt.Errorf("failed to connect to %s", ip)
+	devAddr, err := ensureADBDevice(adbPath, ip)
+	if err != nil {
+		return nil, err
 	}
 
 	// Read shared_prefs via run-as
-	out, err = exec.Command(adbPath, "-s", devAddr, "shell",
+	out, err := exec.Command(adbPath, "-s", devAddr, "shell",
 		"run-as com.example.entrancekiosk cat shared_prefs/PromptParkConfiguration.xml").CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config on %s (is the app installed?): %s", ip, string(out))
@@ -973,14 +1069,14 @@ func (a *App) UpdateEntranceKioskConfig(configs []EntranceConfig) {
 	total := len(configs)
 	for i, dev := range configs {
 		progress := int((float64(i) / float64(total)) * 100)
-		devAddr := dev.IP + ":5555"
-
-		a.emitEvent("kiosk-progress", progress, fmt.Sprintf("📡 Connecting to %s (%s)...", dev.DeviceName, dev.IP))
-		out, err := exec.Command(adbPath, "connect", devAddr).CombinedOutput()
+		devAddr, err := ensureADBDevice(adbPath, dev.IP)
 		if err != nil {
-			a.emitEvent("kiosk-progress", progress, fmt.Sprintf("❌ Failed to connect %s: %s", dev.IP, string(out)))
+			a.emitEvent("kiosk-progress", progress, fmt.Sprintf("Failed to connect %s: %s", dev.IP, err.Error()))
 			continue
 		}
+
+		a.emitEvent("kiosk-progress", progress, fmt.Sprintf("📡 Connecting to %s (%s)...", dev.DeviceName, dev.IP))
+		var out []byte
 
 		a.emitEvent("kiosk-progress", progress+2, fmt.Sprintf("⚙️ Writing SharedPreferences on %s...", dev.DeviceName))
 
@@ -1056,7 +1152,7 @@ func (a *App) UpdateEntranceKioskConfig(configs []EntranceConfig) {
 		// Step 4: Restart App and bypass to Landing Activity
 		a.emitEvent("kiosk-progress", progress+5, fmt.Sprintf("🚀 Restarting App on %s...", dev.DeviceName))
 		exec.Command(adbPath, "-s", devAddr, "shell", "am force-stop com.example.entrancekiosk").Run()
-		
+
 		// Try to start MainActivity with autoStart flag
 		outStart, errStart := exec.Command(adbPath, "-s", devAddr, "shell", "am start -n com.example.entrancekiosk/.ui.main.MainActivity --ez autoStart true").CombinedOutput()
 		if errStart != nil || strings.Contains(string(outStart), "Error") || strings.Contains(string(outStart), "Exception") {
