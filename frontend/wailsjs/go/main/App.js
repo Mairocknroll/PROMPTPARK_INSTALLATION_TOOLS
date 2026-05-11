@@ -6,6 +6,10 @@ export function BrowseAPKFile() {
   return window['go']['main']['App']['BrowseAPKFile']();
 }
 
+export function CancelScheduledDeploy(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CancelScheduledDeploy'](arg1, arg2, arg3, arg4);
+}
+
 export function CheckADBAvailability() {
   return window['go']['main']['App']['CheckADBAvailability']();
 }
@@ -50,6 +54,14 @@ export function DiagnoseADBDevice(arg1, arg2) {
   return window['go']['main']['App']['DiagnoseADBDevice'](arg1, arg2);
 }
 
+export function GetScheduleLog(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetScheduleLog'](arg1, arg2, arg3, arg4);
+}
+
+export function GetScheduleStatus(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['GetScheduleStatus'](arg1, arg2, arg3, arg4);
+}
+
 export function GetSitePresets() {
   return window['go']['main']['App']['GetSitePresets']();
 }
@@ -64,6 +76,10 @@ export function ListDeploymentHistory() {
 
 export function ListInstallationProfiles() {
   return window['go']['main']['App']['ListInstallationProfiles']();
+}
+
+export function ListScheduledDeploys() {
+  return window['go']['main']['App']['ListScheduledDeploys']();
 }
 
 export function ReadEntranceKioskConfig(arg1) {
@@ -108,6 +124,10 @@ export function SaveRemoteEnv(arg1, arg2, arg3, arg4, arg5) {
 
 export function SaveSitePreset(arg1) {
   return window['go']['main']['App']['SaveSitePreset'](arg1);
+}
+
+export function ScheduleDeploy(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['ScheduleDeploy'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function SendMockCameraEvent(arg1, arg2) {

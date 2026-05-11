@@ -221,8 +221,17 @@ func sshAddress(ip string) string {
 
 func sshConfig(username, password string, timeout time.Duration) *ssh.ClientConfig {
 	return &ssh.ClientConfig{
-		User:            username,
-		Auth:            []ssh.AuthMethod{ssh.Password(password)},
+		User: username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(password),
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
+		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         timeout,
 	}

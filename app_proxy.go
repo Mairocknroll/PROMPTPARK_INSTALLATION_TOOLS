@@ -40,6 +40,13 @@ func (a *App) CheckSSHConnection(ip, username, password string) string {
 		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         5 * time.Second,
@@ -61,6 +68,13 @@ func (a *App) ReadRemoteEnv(ip, username, password, targetPath string) (string, 
 		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         10 * time.Second,
@@ -92,6 +106,13 @@ func (a *App) SaveRemoteEnv(ip, username, password, targetPath, envContent strin
 		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         10 * time.Second,
@@ -123,6 +144,13 @@ func (a *App) RedeployProxy(ip, username, password, targetPath string) error {
 		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         10 * time.Second,
@@ -161,6 +189,13 @@ func (a *App) RestoreLatestProxyEnvBackup(ip, username, password, targetPath str
 		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         10 * time.Second,
@@ -200,6 +235,13 @@ func (a *App) CheckPortInUse(ip, username, password string, port int) bool {
 		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         5 * time.Second,
@@ -305,6 +347,13 @@ func (a *App) DeployToServer(ip, username, password, targetPath, envContent stri
 		User: username,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(password),
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         10 * time.Second,
@@ -436,6 +485,13 @@ func (a *App) StartProxyLogs(ip, username, password, targetPath string) {
 			User: username,
 			Auth: []ssh.AuthMethod{
 				ssh.Password(password),
+			ssh.KeyboardInteractive(func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
 			},
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			Timeout:         10 * time.Second,

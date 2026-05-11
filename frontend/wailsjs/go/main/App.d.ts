@@ -4,6 +4,8 @@ import {main} from '../models';
 
 export function BrowseAPKFile():Promise<string>;
 
+export function CancelScheduledDeploy(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+
 export function CheckADBAvailability():Promise<string>;
 
 export function CheckPortInUse(arg1:string,arg2:string,arg3:string,arg4:number):Promise<boolean>;
@@ -26,6 +28,10 @@ export function DeployToServer(arg1:string,arg2:string,arg3:string,arg4:string,a
 
 export function DiagnoseADBDevice(arg1:string,arg2:string):Promise<Array<main.PreflightCheck>>;
 
+export function GetScheduleLog(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
+
+export function GetScheduleStatus(arg1:string,arg2:string,arg3:string,arg4:string):Promise<main.ScheduledDeploy>;
+
 export function GetSitePresets():Promise<Array<main.SitePreset>>;
 
 export function Greet(arg1:string):Promise<string>;
@@ -33,6 +39,8 @@ export function Greet(arg1:string):Promise<string>;
 export function ListDeploymentHistory():Promise<Array<main.DeploymentHistoryRecord>>;
 
 export function ListInstallationProfiles():Promise<Array<main.InstallationProfile>>;
+
+export function ListScheduledDeploys():Promise<Array<main.ScheduledDeploy>>;
 
 export function ReadEntranceKioskConfig(arg1:string):Promise<Record<string, string>>;
 
@@ -55,6 +63,8 @@ export function SaveInstallationProfile(arg1:main.InstallationProfile):Promise<v
 export function SaveRemoteEnv(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function SaveSitePreset(arg1:main.SitePreset):Promise<void>;
+
+export function ScheduleDeploy(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string):Promise<main.ScheduledDeploy>;
 
 export function SendMockCameraEvent(arg1:string,arg2:string):Promise<string>;
 

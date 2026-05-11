@@ -6,6 +6,12 @@
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
+  "info": {
+    "productVersion": "1.1.0.0",
+    "productName": "PromptPark Installation Tools",
+    "copyright": "Copyright © 2026 Jen Parking",
+    "comments": "Parking system installation and deployment tools"
+  },
   "author": {
     "name": "Jatidthaa Sanpimpha",
     "email": "jatidthaa.s@jenparking.com"

@@ -1,11 +1,15 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    CancelScheduledDeploy,
     CheckPortInUse,
     CheckSSHConnection,
     DeleteInstallationProfile,
     DeployToServer,
+    GetScheduleLog,
+    GetScheduleStatus,
     ListDeploymentHistory,
     ListInstallationProfiles,
+    ListScheduledDeploys,
     ReadRemoteEnv,
     RedeployProxy,
     RestoreLatestProxyEnvBackup,
@@ -14,6 +18,7 @@ import {
     SaveEnvConfig,
     SaveInstallationProfile,
     SaveRemoteEnv,
+    ScheduleDeploy,
     StartProxyLogs,
     StopProxyLogs,
     ValidateProxyEnv
@@ -159,10 +164,18 @@ function ProxyInstall() {
         targetPath: '/home/jpark/go_local_proxy_api'
     });
     const [isLoadingRemote, setIsLoadingRemote] = useState(false);
+    const [schedules, setSchedules] = useState([]);
+    const [scheduleForm, setScheduleForm] = useState({ datetime: '', deployType: 'restart' });
+    const [scheduleCountdowns, setScheduleCountdowns] = useState({});
     const logsEndRef = useRef(null);
 
     const current = view === 'detail' ? selected : draft;
     const envContent = useMemo(() => buildEnv(current.system, current.lanes), [current]);
+
+    const refreshSchedules = useCallback(async () => {
+        const list = await ListScheduledDeploys().catch(() => []);
+        setSchedules(Array.isArray(list) ? list : []);
+    }, []);
 
     const refreshSites = async () => {
         const profiles = await ListInstallationProfiles().catch(() => []);
@@ -173,7 +186,26 @@ function ProxyInstall() {
 
     useEffect(() => {
         refreshSites();
-    }, []);
+        refreshSchedules();
+    }, [refreshSchedules]);
+
+    // Countdown timer for pending schedules
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const next = {};
+            schedules.forEach((s) => {
+                if (s.status !== 'pending') return;
+                const diff = new Date(s.scheduledAt) - new Date();
+                if (diff <= 0) { next[s.id] = 'Time reached'; return; }
+                const h = Math.floor(diff / 3600000);
+                const m = Math.floor((diff % 3600000) / 60000);
+                const sec = Math.floor((diff % 60000) / 1000);
+                next[s.id] = h > 24 ? `${Math.floor(h / 24)}d ${h % 24}h ${m}m` : `${h}h ${m}m ${sec}s`;
+            });
+            setScheduleCountdowns(next);
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [schedules]);
 
     useEffect(() => {
         ValidateProxyEnv(envContent).then(setValidation).catch(() => setValidation(null));
@@ -253,6 +285,20 @@ function ProxyInstall() {
     const openSiteWithSSH = async (site, tab = 'overview') => {
         const withCredentials = promptSSHCredentials(site);
         if (!withCredentials) return;
+
+        // Validate SSH credentials first
+        setStatusLog('กำลังตรวจสอบ SSH...');
+        const sshResult = await CheckSSHConnection(
+            withCredentials.serverConfig.ip,
+            withCredentials.serverConfig.username,
+            withCredentials.serverConfig.password
+        );
+        if (sshResult !== 'Success') {
+            alert(`SSH เชื่อมต่อไม่ได้ — ตรวจสอบ Username/Password\n\n${sshResult}`);
+            setStatusLog(`SSH failed: ${sshResult}`);
+            return;
+        }
+
         setStatusLog('Loading remote .env...');
         try {
             const remoteEnv = await ReadRemoteEnv(
@@ -272,8 +318,9 @@ function ProxyInstall() {
             openSite(hydratedSite, tab);
             setStatusLog(`Loaded .env from ${withCredentials.serverConfig.ip}:${withCredentials.serverConfig.targetPath}`);
         } catch (e) {
+            // SSH is confirmed working but .env read failed (e.g. file not found) — still allow opening
             openSite(withCredentials, tab);
-            setStatusLog(`Opened site, but remote .env could not be loaded: ${e}`);
+            setStatusLog(`เปิด site แล้ว แต่ไม่สามารถอ่าน remote .env ได้: ${e}`);
         }
     };
 
@@ -488,6 +535,77 @@ function ProxyInstall() {
     const stopLogs = async () => {
         await StopProxyLogs();
         setStreaming(false);
+    };
+
+    // --- Schedule functions ---
+    const createSchedule = async () => {
+        if (!scheduleForm.datetime) { alert('กรุณาเลือกวันและเวลา'); return; }
+        if (!validation?.ok) { alert('แก้ไข validation errors ก่อน schedule (ไปแก้ที่แท็บ Config)'); return; }
+        const server = current.serverConfig;
+        if (!server.ip || !server.username || !server.password || !server.targetPath) {
+            alert('กรุณากรอก Server IP, Username, Password และ Project Path ให้ครบ');
+            return;
+        }
+        const scheduledDate = new Date(scheduleForm.datetime);
+        if (scheduledDate <= new Date()) { alert('เวลาต้องเป็นอนาคต'); return; }
+
+        // Test SSH connection first
+        setStatusLog('กำลังทดสอบการเชื่อมต่อ SSH...');
+        try {
+            const sshResult = await CheckSSHConnection(server.ip, server.username, server.password);
+            if (sshResult !== 'Success') {
+                setStatusLog(`SSH เชื่อมต่อไม่ได้: ${sshResult}\n\nตรวจสอบ:\n- Server IP: ${server.ip}\n- Username: ${server.username}\n- Password ถูกต้องหรือไม่`);
+                alert(`SSH เชื่อมต่อไม่ได้: ${sshResult}\n\nตรวจสอบ Username และ Password ให้ถูกต้อง`);
+                return;
+            }
+        } catch (e) {
+            setStatusLog(`SSH test failed: ${e}`);
+            alert(`SSH เชื่อมต่อไม่ได้: ${e}`);
+            return;
+        }
+
+        const typeLabel = scheduleForm.deployType === 'build' ? 'Build & Deploy' : 'Restart Only';
+        if (!window.confirm(`ยืนยัน Schedule ${typeLabel}\nเวลา: ${scheduledDate.toLocaleString('th-TH')}\nServer: ${server.ip}\n\n.env จะถูก save ทันที docker compose จะ restart เมื่อถึงเวลา`)) return;
+        setStatusLog('Creating schedule...');
+        try {
+            const result = await ScheduleDeploy(current.name, server.ip, server.username, server.password, server.targetPath, envContent, scheduleForm.deployType, scheduleForm.datetime);
+            setStatusLog(`✅ Schedule created: ${result.id} → ${scheduledDate.toLocaleString('th-TH')}`);
+            setScheduleForm({ datetime: '', deployType: 'restart' });
+            await refreshSchedules();
+        } catch (e) { setStatusLog(`❌ Schedule failed: ${e}`); alert(`Failed: ${e}`); }
+    };
+
+    const checkScheduleStatus = async (schedule) => {
+        const site = ensureSSHCredentials();
+        if (!site) return;
+        const server = site.serverConfig;
+        try {
+            await GetScheduleStatus(schedule.id, server.ip, server.username, server.password);
+            await refreshSchedules();
+            setStatusLog(`Status refreshed for ${schedule.id}`);
+        } catch (e) { alert(`Failed to check status: ${e}`); }
+    };
+
+    const cancelSchedule = async (schedule) => {
+        if (!window.confirm(`ยกเลิก schedule ${schedule.id}?`)) return;
+        const site = ensureSSHCredentials();
+        if (!site) return;
+        const server = site.serverConfig;
+        try {
+            await CancelScheduledDeploy(schedule.id, server.ip, server.username, server.password);
+            await refreshSchedules();
+            setStatusLog(`Schedule ${schedule.id} cancelled.`);
+        } catch (e) { alert(`Failed to cancel: ${e}`); }
+    };
+
+    const viewScheduleLog = async (schedule) => {
+        const site = ensureSSHCredentials();
+        if (!site) return;
+        const server = site.serverConfig;
+        try {
+            const log = await GetScheduleLog(schedule.id, server.ip, server.username, server.password);
+            setStatusLog(log);
+        } catch (e) { alert(`Failed to get log: ${e}`); }
     };
 
     const siteCounts = (site) => ({
@@ -736,11 +854,34 @@ function ProxyInstall() {
         <div className="space-y-4">
             {ServerConnectionForm()}
             <div className="flex flex-wrap gap-2">
-                <button onClick={deploy} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded text-sm font-bold">Deploy</button>
+                <button onClick={deploy} className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded text-sm font-bold">Deploy Now</button>
                 <button onClick={saveRemoteEnv} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm">Save Remote .env</button>
                 <button onClick={redeploy} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm">Redeploy</button>
                 <button onClick={rollback} className="bg-yellow-700 hover:bg-yellow-600 text-white px-4 py-2 rounded text-sm">Rollback</button>
             </div>
+
+            {/* Schedule Deploy Section */}
+            <div className="bg-[#161b22] border border-gray-800 rounded-lg p-5">
+                <h3 className="text-xs text-purple-400 font-bold uppercase mb-3">⏰ Schedule Deploy</h3>
+                <p className="text-[10px] text-gray-500 mb-3">ตั้งเวลา deploy ล่วงหน้า — ระบบจะสร้าง cron job บน server และ deploy อัตโนมัติเมื่อถึงเวลา แม้ปิด app แล้ว</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <label className="block">
+                        <span className="text-[10px] text-gray-500 uppercase">Release Date & Time</span>
+                        <input type="datetime-local" className="mt-1 w-full bg-[#0d1117] border border-gray-800 rounded px-3 py-2 text-sm" value={scheduleForm.datetime} onChange={(e) => setScheduleForm({ ...scheduleForm, datetime: e.target.value })} />
+                    </label>
+                    <label className="block">
+                        <span className="text-[10px] text-gray-500 uppercase">Deploy Type</span>
+                        <select className="mt-1 w-full bg-[#0d1117] border border-gray-800 rounded px-3 py-2 text-sm" value={scheduleForm.deployType} onChange={(e) => setScheduleForm({ ...scheduleForm, deployType: e.target.value })}>
+                            <option value="restart">Restart Only (down → up)</option>
+                            <option value="build">Build & Restart (down → up --build)</option>
+                        </select>
+                    </label>
+                    <div className="flex items-end">
+                        <button onClick={createSchedule} className="w-full bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded text-sm font-bold">⏰ Schedule Deploy</button>
+                    </div>
+                </div>
+            </div>
+
             {progress > 0 && <div className="w-full bg-gray-800 rounded h-2"><div className="bg-blue-600 h-2 rounded" style={{ width: `${progress}%` }} /></div>}
             <pre className="bg-black border border-gray-800 rounded p-4 text-xs text-gray-300 whitespace-pre-wrap min-h-[220px]">{statusLog || 'No deployment output yet.'}</pre>
         </div>
@@ -758,14 +899,17 @@ function ProxyInstall() {
             </div>
 
             <div className="flex gap-5 border-b border-gray-800 mb-6">
-                {['overview', 'config', 'deploy', 'logs', 'history'].map((tab) => (
-                    <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-2 text-sm font-bold capitalize ${activeTab === tab ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>{tab}</button>
+                {['overview', 'config', 'deploy', 'schedule', 'logs', 'history'].map((tab) => (
+                    <button key={tab} onClick={() => { setActiveTab(tab); if (tab === 'schedule') refreshSchedules(); }} className={`pb-2 text-sm font-bold capitalize ${activeTab === tab ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>
+                        {tab === 'schedule' ? `⏰ ${tab}` : tab}
+                    </button>
                 ))}
             </div>
 
             {activeTab === 'overview' && Overview()}
             {activeTab === 'config' && ConfigTab()}
             {activeTab === 'deploy' && DeployPanel()}
+            {activeTab === 'schedule' && ScheduleTab()}
             {activeTab === 'logs' && LogsTab()}
             {activeTab === 'history' && HistoryTab()}
         </>
@@ -823,6 +967,108 @@ function ProxyInstall() {
             <pre className="bg-black border border-gray-800 rounded p-4 h-[60vh] overflow-auto text-xs text-gray-300 whitespace-pre-wrap">{logs || 'No logs.'}<span ref={logsEndRef} /></pre>
         </div>
     );
+
+    const scheduleStatusColor = (status) => {
+        const map = { pending: 'bg-yellow-900 text-yellow-300', running: 'bg-blue-900 text-blue-300', success: 'bg-green-900 text-green-300', failed: 'bg-red-900 text-red-300', cancelled: 'bg-gray-800 text-gray-400' };
+        return map[status] || 'bg-gray-800 text-gray-400';
+    };
+
+    const scheduleStatusIcon = (status) => {
+        const map = { pending: '⏳', running: '🔄', success: '✅', failed: '❌', cancelled: '⚫' };
+        return map[status] || '❓';
+    };
+
+    const ScheduleTab = () => {
+        const siteSchedules = schedules.filter((s) => s.siteName === current.name);
+        return (
+            <div className="space-y-6">
+                {/* Config Preview + Edit Link */}
+                <div className="bg-[#0d1117] border border-purple-900/30 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 className="text-[10px] text-purple-400 uppercase font-bold">📦 Config ที่จะใช้ Deploy</h3>
+                            <p className="text-[10px] text-gray-500 mt-1">ตัวอย่าง .env ที่จะถูก deploy เมื่อถึงเวลา — ถ้าต้องการแก้ไขให้ไปที่แท็บ Config ก่อน</p>
+                        </div>
+                        <button onClick={() => setActiveTab('config')} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold">ไปแก้ไข Config →</button>
+                    </div>
+                    {ValidationPanel()}
+                    <details className="mt-2">
+                        <summary className="text-[10px] text-gray-500 cursor-pointer hover:text-gray-300">ดูตัวอย่าง .env</summary>
+                        <pre className="text-[11px] text-green-400 whitespace-pre-wrap leading-5 mt-2 max-h-48 overflow-y-auto bg-black rounded p-3">{envContent}</pre>
+                    </details>
+                </div>
+
+                {/* Create New Schedule */}
+                <div className="bg-[#161b22] border border-gray-800 rounded-lg p-5">
+                    <h3 className="text-xs text-purple-400 font-bold uppercase mb-3">⏰ Create Scheduled Deploy</h3>
+                    <p className="text-[10px] text-gray-500 mb-4">ตั้งเวลา deploy ล่วงหน้า — config (.env) จะถูก save ทันที แต่ docker compose จะ restart เมื่อถึงเวลาที่กำหนด แม้ปิด app แล้ว</p>
+                    {ServerConnectionForm()}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                        <label className="block">
+                            <span className="text-[10px] text-gray-500 uppercase">Release Date & Time</span>
+                            <input type="datetime-local" className="mt-1 w-full bg-[#0d1117] border border-gray-800 rounded px-3 py-2 text-sm" value={scheduleForm.datetime} onChange={(e) => setScheduleForm({ ...scheduleForm, datetime: e.target.value })} />
+                        </label>
+                        <label className="block">
+                            <span className="text-[10px] text-gray-500 uppercase">Deploy Type</span>
+                            <select className="mt-1 w-full bg-[#0d1117] border border-gray-800 rounded px-3 py-2 text-sm" value={scheduleForm.deployType} onChange={(e) => setScheduleForm({ ...scheduleForm, deployType: e.target.value })}>
+                                <option value="restart">Restart Only (down → up -d)</option>
+                                <option value="build">Build & Restart (down → up -d --build)</option>
+                            </select>
+                        </label>
+                        <div className="flex items-end">
+                            <button onClick={createSchedule} className="w-full bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded text-sm font-bold">⏰ Schedule Deploy</button>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Schedule List */}
+                <div>
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-bold text-white">Scheduled Deployments ({siteSchedules.length})</h3>
+                        <button onClick={refreshSchedules} className="text-xs text-blue-400 hover:text-blue-300">Refresh List</button>
+                    </div>
+                    {siteSchedules.length === 0 && <div className="text-sm text-gray-500 border border-dashed border-gray-700 rounded-lg p-6 text-center">ยังไม่มี scheduled deploy สำหรับ site นี้</div>}
+                    <div className="space-y-3">
+                        {siteSchedules.map((s) => (
+                            <div key={s.id} className="bg-[#161b22] border border-gray-800 rounded-lg p-5">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">{scheduleStatusIcon(s.status)}</span>
+                                            <span className="text-sm font-bold text-white">Schedule #{s.id}</span>
+                                            <span className={`text-[10px] px-2 py-0.5 rounded ${scheduleStatusColor(s.status)}`}>{s.status}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">Deploy type: <span className="text-gray-300">{s.deployType === 'build' ? 'Build & Restart' : 'Restart Only'}</span></div>
+                                    </div>
+                                    {s.status === 'pending' && scheduleCountdowns[s.id] && (
+                                        <div className="text-right">
+                                            <div className="text-[10px] text-gray-500 uppercase">Countdown</div>
+                                            <div className="text-lg font-bold text-purple-400 font-mono">{scheduleCountdowns[s.id]}</div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-gray-400 mt-4">
+                                    <div><span className="text-gray-600">Scheduled At</span><br />{new Date(s.scheduledAt).toLocaleString('th-TH')}</div>
+                                    <div><span className="text-gray-600">Created At</span><br />{new Date(s.createdAt).toLocaleString('th-TH')}</div>
+                                    <div><span className="text-gray-600">Server</span><br />{s.server}</div>
+                                    <div><span className="text-gray-600">Completed At</span><br />{s.completedAt ? new Date(s.completedAt).toLocaleString('th-TH') : '-'}</div>
+                                </div>
+                                {s.statusMsg && <pre className="bg-black border border-gray-800 rounded p-3 text-[11px] text-gray-400 whitespace-pre-wrap mt-3 max-h-40 overflow-y-auto">{s.statusMsg}</pre>}
+                                <div className="flex gap-2 mt-4">
+                                    <button onClick={() => checkScheduleStatus(s)} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-xs font-bold">🔄 Refresh Status</button>
+                                    <button onClick={() => viewScheduleLog(s)} className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-xs">📄 View Log</button>
+                                    {s.status === 'pending' && <button onClick={() => cancelSchedule(s)} className="ml-auto bg-red-700 hover:bg-red-600 text-white px-3 py-1.5 rounded text-xs font-bold">❌ Cancel</button>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Status Output */}
+                <pre className="bg-black border border-gray-800 rounded p-4 text-xs text-gray-300 whitespace-pre-wrap min-h-[120px]">{statusLog || 'No output.'}</pre>
+            </div>
+        );
+    };
 
     const HistoryTab = () => (
         <div className="space-y-3">

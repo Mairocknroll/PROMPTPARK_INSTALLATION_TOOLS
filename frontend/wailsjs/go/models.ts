@@ -370,6 +370,40 @@ export namespace main {
 	        this.detail = source["detail"];
 	    }
 	}
+	export class ScheduledDeploy {
+	    id: string;
+	    siteName: string;
+	    server: string;
+	    username: string;
+	    targetPath: string;
+	    envContent: string;
+	    deployType: string;
+	    scheduledAt: string;
+	    createdAt: string;
+	    status: string;
+	    statusMsg: string;
+	    completedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScheduledDeploy(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.siteName = source["siteName"];
+	        this.server = source["server"];
+	        this.username = source["username"];
+	        this.targetPath = source["targetPath"];
+	        this.envContent = source["envContent"];
+	        this.deployType = source["deployType"];
+	        this.scheduledAt = source["scheduledAt"];
+	        this.createdAt = source["createdAt"];
+	        this.status = source["status"];
+	        this.statusMsg = source["statusMsg"];
+	        this.completedAt = source["completedAt"];
+	    }
+	}
 	export class SitePreset {
 	    id: string;
 	    siteName: string;

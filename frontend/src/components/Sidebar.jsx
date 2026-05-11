@@ -46,7 +46,7 @@ function Sidebar({ activeMenu, setActiveMenu }) {
                     🚀 General App Installer
                 </button>
             </div>
-            <div className="text-[10px] text-gray-600 text-center pb-2 pt-4 border-t border-gray-800">v1.0.0</div>
+            <div className="text-[10px] text-gray-600 text-center pb-2 pt-4 border-t border-gray-800">v1.1.0</div>
         </div>
     );
 }
